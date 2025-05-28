@@ -10,12 +10,11 @@ import jakarta.inject.Inject;
 @MicronautTest
 class Webauthn4jMicronautTest {
 
-    @Inject
-    EmbeddedApplication<?> application;
+	@Inject
+	private EmbeddedApplication<?> application;
 
-    @Test
-    void testItWorks() {
-        Assertions.assertTrue(application.isRunning());
-    }
-
+	@Test
+	public void testItWorks() {
+		Assertions.assertTrue(application.isRunning());
+	}
 }
