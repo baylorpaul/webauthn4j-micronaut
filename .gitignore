@@ -1,0 +1,13 @@
+Thumbs.db
+.DS_Store
+.gradle
+build/
+target/
+# IntelliJ
+out/
+.micronaut/
+*.iml
+.project
+.settings
+.classpath
+.factorypath

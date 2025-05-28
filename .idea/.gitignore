@@ -1,0 +1,38 @@
+## See https://intellij-support.jetbrains.com/hc/en-us/articles/206544839-How-to-manage-projects-under-Version-Control-Systems
+
+# This is generated on import
+modules.xml
+
+# Editor-based HTTP Client requests
+/httpRequests/
+
+# User-specific stuff
+/**/workspace.xml
+/**/tasks.xml
+/**/usage.statistics.xml
+/**/dictionaries
+/**/shelf
+
+# Generated files
+/**/contentModel.xml
+
+## Sensitive or high-churn files
+
+# Datasource local storage ignored files
+/**/dataSources/
+/**/dataSources.ids
+/**/dataSources.local.xml
+dataSources.xml
+
+/**/sqlDataSources.xml
+/**/dynamic.xml
+/**/uiDesigner.xml
+/**/dbnavigator.xml
+
+## Gradle
+/**/gradle.xml
+/**/libraries
+
+## Plugins
+# AWS Toolkit
+aws.xml
