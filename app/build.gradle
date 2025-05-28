@@ -1,6 +1,7 @@
 plugins {
     id("io.micronaut.application") version "4.5.3"
     id("com.gradleup.shadow") version "8.3.6"
+    id("idea")
     id("io.micronaut.aot") version "4.5.3"
 }
 
@@ -18,7 +19,7 @@ dependencies {
     annotationProcessor("io.micronaut.security:micronaut-security-annotations")
     annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
     annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
-    implementation("io.micrometer:context-propagation")
+    //implementation("io.micrometer:context-propagation")
     implementation("io.micronaut.data:micronaut-data-jdbc")
     implementation("io.micronaut.flyway:micronaut-flyway")
     implementation("io.micronaut.reactor:micronaut-reactor")
@@ -27,16 +28,23 @@ dependencies {
     implementation("io.micronaut.sql:micronaut-jdbc-hikari")
     implementation("io.micronaut.validation:micronaut-validation")
     implementation("jakarta.validation:jakarta.validation-api")
+    implementation("jakarta.persistence:jakarta.persistence-api")
+    implementation("io.github.baylorpaul:micronaut-json-api:3.0.0")
+    implementation("org.springframework.security:spring-security-crypto:6.5.0")
+    implementation("com.webauthn4j:webauthn4j-core:0.29.2.RELEASE")
     compileOnly("io.micronaut:micronaut-http-client")
     compileOnly("org.projectlombok:lombok")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
     runtimeOnly("org.slf4j:slf4j-simple")
+    runtimeOnly("com.google.cloud.sql:postgres-socket-factory:1.25.1")
+    testAnnotationProcessor("org.projectlombok:lombok")
     testImplementation("io.micronaut:micronaut-http-client")
     testImplementation("org.junit.jupiter:junit-jupiter-params")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
     testImplementation("org.testcontainers:testcontainers")
+    testCompileOnly("org.projectlombok:lombok")
     aotPlugins platform("io.micronaut.platform:micronaut-platform:4.8.2")
     aotPlugins("io.micronaut.security:micronaut-security-aot")
 }
@@ -70,7 +78,11 @@ micronaut {
         optimizeClassLoading = true
         deduceEnvironment = true
         optimizeNetty = true
-        replaceLogbackXml = true
+        // Comment out "replaceLogbackXml". It's from https://github.com/micronaut-projects/micronaut-starter/pull/2424
+        // It seems it should be false for native builds. If true on projects using the "slf4j-simple" feature, then
+        // './gradlew bootRun' fails with this error:
+        // The logback.xml conversion feature requires logback 1.4 on the AOT optimizer classpath.
+        // replaceLogbackXml = true
         configurationProperties.put("micronaut.security.jwks.enabled","false")
     }
 }
@@ -81,3 +93,4 @@ tasks.named("dockerfileNative") {
 }
 
 
+apply from: 'custom.gradle'

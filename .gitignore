@@ -11,3 +11,5 @@ out/
 .settings
 .classpath
 .factorypath
+
+app/src/main/resources/**/application-*-top-secret.properties

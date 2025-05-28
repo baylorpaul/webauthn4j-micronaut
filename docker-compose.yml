@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:17.5
+    container_name: webauthn4j_micronaut_postgres
+    ports:
+      - "9492:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=topsecretpostgrespassword
+    volumes:
+      - postgres-vol-17:/var/lib/postgresql/data
+volumes:
+  postgres-vol-17:
