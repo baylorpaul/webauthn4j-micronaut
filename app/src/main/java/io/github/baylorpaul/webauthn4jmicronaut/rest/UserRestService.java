@@ -4,6 +4,7 @@ import io.github.baylorpaul.micronautjsonapi.model.JsonApiResource;
 import io.github.baylorpaul.micronautjsonapi.util.JsonApiUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.UserRepository;
+import io.github.baylorpaul.webauthn4jmicronaut.service.model.enums.ConfirmationType;
 import io.github.baylorpaul.webauthn4jmicronaut.util.ApiUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.Utility;
 import io.micronaut.core.annotation.NonNull;
@@ -26,6 +27,9 @@ public class UserRestService {
 
 	@Inject
 	private UserRepository userRepo;
+
+	@Inject
+	private SecurityRestService securityRestService;
 
 	@Inject
 	private JsonMapper jsonMapper;
@@ -66,6 +70,16 @@ public class UserRestService {
 			throw new HttpStatusException(HttpStatus.CONFLICT, "email address already in use");
 		}
 		return formattedEmail;
+	}
+
+	/**
+	 * Check that the passkey addition claims from the token match the expected values, the claim is not expired, and
+	 * the user is enabled.
+	 * @return the non-null user for which we're processing a passkey addition request
+	 * @throws HttpStatusException if the JWT could not be verified
+	 */
+	public @NonNull User validateJwtClaimsForPasskeyAddition(@NonNull @NotBlank String token) throws HttpStatusException {
+		return securityRestService.findUserIfValidConfirmationToken(token, ConfirmationType.PASSKEY_ADDITION, true);
 	}
 
 	public User updateUser(@NonNull User user, @NonNull JsonApiResource res) {

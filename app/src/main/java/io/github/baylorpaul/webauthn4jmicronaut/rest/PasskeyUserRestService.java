@@ -196,15 +196,11 @@ public class PasskeyUserRestService implements PasskeyService {
 	public @NonNull PublicKeyCredentialCreationOptionsSessionDto generateRegistrationOptionsAndSaveChallenge(
 			@NotBlank String uniqueNameOrEmail, @Nullable String displayName
 	) throws HttpStatusException {
-// TODO If adding a passkey to an existing user, require authentication, and look up the pre-existing user record
 		PublicKeyCredentialUserEntity credUser = buildCredentialUserIfNotExists(uniqueNameOrEmail, displayName);
 
-		// "excludeCredentials" is a list of existing credentials' IDs to prevent duplicating a passkey from the passkey
-		// provider. I.e. Prevent users from re-registering existing authenticators
-// TODO when does "excludeCredentials" get used? Just when adding a passkey to an existing user? At the time of this
-//  writing the "userHandle" was always just generated, so there will never be any associated
-//  PublicKeyCredentialDescriptor records to "exclude".
-		List<PublicKeyCredentialDescriptor> excludeCredentials = findPreviouslyRegisteredAuthenticators(credUser);
+		// We just generated the "userHandle", so there will not be any associated PublicKeyCredentialDescriptor records
+		// to "exclude".
+		final List<PublicKeyCredentialDescriptor> excludeCredentials = null;
 
 		// When generating passkey registration options, we'll have the email and display name, but not during
 		// registration verification. The WebAuthn standard does not include this information in the credential data.
@@ -217,6 +213,29 @@ public class PasskeyUserRestService implements PasskeyService {
 				credUser,
 				REGISTRATION_TIMEOUT.plus(5L, ChronoUnit.SECONDS)
 		);
+
+		return generateCreationOptionsAndSaveChallenge(credUser, excludeCredentials, passkeyChallenge);
+	}
+
+	@Override
+	public @NonNull PublicKeyCredentialCreationOptionsSessionDto generateCreationOptionsForExistingAccountAndSaveChallenge(
+			@NotBlank String token
+	) throws HttpStatusException {
+		// Verify the token
+		User user = userRestService.validateJwtClaimsForPasskeyAddition(token);
+
+		PasskeyChallenge passkeyChallenge = findOrCreatePasskeyUserHandleForExistingUserWithChallenge(
+				user,
+				REGISTRATION_TIMEOUT.plus(5L, ChronoUnit.SECONDS)
+		);
+		String userHandleBase64Url = passkeyChallenge.getPasskeyUserHandle().getId();
+
+		byte[] userHandle = Base64UrlUtil.decode(userHandleBase64Url);
+		PublicKeyCredentialUserEntity credUser = new PublicKeyCredentialUserEntity(userHandle, user.getEmail(), user.getName());
+
+		// "excludeCredentials" is a list of existing credentials' IDs to prevent duplicating a passkey from the passkey
+		// provider. I.e. Prevent users from re-registering existing authenticators
+		List<PublicKeyCredentialDescriptor> excludeCredentials = findPreviouslyRegisteredAuthenticators(credUser);
 
 		return generateCreationOptionsAndSaveChallenge(credUser, excludeCredentials, passkeyChallenge);
 	}
@@ -332,18 +351,23 @@ public class PasskeyUserRestService implements PasskeyService {
 		PasskeyUserHandle passkeyUserHandle = passkeyUserHandleRepo.findById(userHandleBase64Url)
 				.orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "passkey user handle not found"));
 
-		// Create the user, if possible.
-		// Throw an exception if "formattedEmail" already exists for a user. We purposely didn't check when generating
-		// the PasskeyUserHandle, and it's possible a user with that email could have been created in the meantime.
-		User user = userRestService.createUser(passkeyUserHandle.getEmail(), passkeyUserHandle.getName(), null);
+		// If this is for a new user
+		if (passkeyUserHandle.getUser() == null) {
+			// Create the user, if possible.
+			// Throw an exception if "formattedEmail" already exists for a user. We purposely didn't check when generating
+			// the PasskeyUserHandle, and it's possible a user with that email could have been created in the meantime.
+			User newUser = userRestService.createUser(passkeyUserHandle.getEmail(), passkeyUserHandle.getName(), null);
 
-		// For PasskeyUserHandle, set the foreign key to match the user. We want to retain the "userHandle" value (the
-		// ID) for future use. Also, set the email and name to null since they're no longer needed. Otherwise, having
-		// values there that may not match the user in the future may cause confusion.
-		passkeyUserHandle.setUser(user);
-		passkeyUserHandle.setEmail(null);
-		passkeyUserHandle.setName(null);
-		passkeyUserHandle = passkeyUserHandleRepo.update(passkeyUserHandle);
+			// For PasskeyUserHandle, set the foreign key to match the user. We want to retain the "userHandle" value (the
+			// ID) for future use. Also, set the email and name to null since they're no longer needed. Otherwise, having
+			// values there that may not match the user in the future may cause confusion.
+			passkeyUserHandle.setUser(newUser);
+			passkeyUserHandle.setEmail(null);
+			passkeyUserHandle.setName(null);
+			passkeyUserHandle = passkeyUserHandleRepo.update(passkeyUserHandle);
+		}
+
+		User user = passkeyUserHandle.getUser();
 
 		AttestationStatement attestationStatement = cred.getAttestationStatement();
 		if (attestationStatement == null) {
@@ -525,6 +549,30 @@ public class PasskeyUserRestService implements PasskeyService {
 				.build();
 
 		passkeyUserHandle = passkeyUserHandleRepo.save(passkeyUserHandle);
+
+		return generateChallenge(passkeyUserHandle, challengeTimeout);
+	}
+
+	/**
+	 * Find or create the user handle for an existing user and save the challenge. The user may not already have user
+	 * handle, such as if they don't have a passkey yet.
+	 */
+	private PasskeyChallenge findOrCreatePasskeyUserHandleForExistingUserWithChallenge(
+			@NonNull User user, Duration challengeTimeout
+	) {
+		PasskeyUserHandle passkeyUserHandle = passkeyUserHandleRepo.findByUserId(user.getId())
+				.orElseGet(() -> {
+					byte[] userHandle = generateUserHandle();
+
+					return passkeyUserHandleRepo.save(PasskeyUserHandle.builder()
+							.id(Base64UrlUtil.encodeToString(userHandle))
+							.user(user)
+							// Don't set the email or name. We already have a user record, and that is the source of truth.
+							.email(null)
+							.name(null)
+							.build()
+					);
+				});
 
 		return generateChallenge(passkeyUserHandle, challengeTimeout);
 	}

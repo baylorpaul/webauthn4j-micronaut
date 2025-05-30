@@ -107,7 +107,21 @@ public class PasskeyController {
 	}
 
 	/**
-	 * POST the WebAuthn passkey registration response
+	 * GET WebAuthn passkey registration / attestation options for adding to an existing account. The user account is
+	 * determined via the token provided, which was recently emailed to the user.
+	 * @param token the short-lived token that was recently issued to the user
+	 */
+	@Secured(SecurityRule.IS_ANONYMOUS) // no security
+	@Get("/methods/generateCreationOptionsForExistingAccount")
+	public PublicKeyCredentialCreationOptionsSessionDto generateCreationOptionsForExistingAccount(
+			@NotBlank String token
+	) {
+// TODO maybe this shouldn't be a GET request since it has a token? Although the email links to the frontend's web page have to be GET requests with the token.
+		return passkeyService.generateCreationOptionsForExistingAccountAndSaveChallenge(token);
+	}
+
+	/**
+	 * POST the WebAuthn passkey registration response, whether for a new user or an existing user.
 	 * @param challengeSessionId the session ID associated with the recently issued challenge. This is required because
 	 *            the API does not retain a session to link the generated registration options to the verification.
 	 * @see <a href="https://developers.google.com/identity/passkeys/developer-guides/server-registration#store_the_public_key">Store the public key</a>

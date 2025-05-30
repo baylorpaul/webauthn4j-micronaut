@@ -29,6 +29,15 @@ public interface PasskeyService {
 	) throws HttpStatusException;
 
 	/**
+	 * Generate passkey creation options for adding a passkey to an existing user and persist the challenge
+	 * @param token the short-lived token that was recently issued to the user
+	 * @throws HttpStatusException if the creation options could not be generated
+	 */
+	@NonNull PublicKeyCredentialCreationOptionsSessionDto generateCreationOptionsForExistingAccountAndSaveChallenge(
+			@NotBlank String token
+	) throws HttpStatusException;
+
+	/**
 	 * Find the non-expired challenge and discard/delete it from persistence. Discarding the challenge is important to
 	 * prevent replay attacks.
 	 * @param challengeSessionId the session ID
@@ -50,7 +59,8 @@ public interface PasskeyService {
 	) throws HttpStatusException;
 
 	/**
-	 * Persist the credentials after the passkey has been verified. And associate the credential with the user handle ID.
+	 * Persist the credentials after the passkey has been verified. And associate the credential with the user handle
+	 * ID. If the user handle ID is not yet associated with a user, create the user.
 	 * @param userHandleBase64Url the user handle, encoded in Base64Url. This is required because the API does not retain
 	 *            any session to link the generated registration options to the verification.
 	 * @throws HttpStatusException if the credentials could not be persisted

@@ -8,7 +8,9 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.security.authentication.ServerAuthentication;
 
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.Collections;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -72,5 +74,32 @@ public class TokenUtil {
 		Map<String, Object> attributes = new LinkedHashMap<>();
 		attributes.put(JWTClaimNames.SUBJECT, Long.toString(user.getId()));
 		return attributes;
+	}
+
+	public static Long findJwtSubjectAsUserId(@NonNull Map<String, ?> jwtClaims) throws NumberFormatException {
+		final Object subObj = jwtClaims.get(JWTClaimNames.SUBJECT);
+		if (subObj instanceof String subStr) {
+			return Long.parseLong(subStr);
+		} else if (subObj != null) {
+			throw new RuntimeException("Unexpected object type for 'sub' claim: " + subObj.getClass().getCanonicalName());
+		} else {
+			return null;
+		}
+	}
+
+	public static Instant findJwtExpirationDate(@NonNull Map<String, ?> jwtClaims) {
+		final Instant expiration;
+		final Object expObj = jwtClaims.get(JWTClaimNames.EXPIRATION_TIME);
+		if (expObj instanceof Date expDate) {
+			// Normally "exp" is an epoch second, but JWTClaimsSet.parse() will return a Date
+			expiration = expDate.toInstant();
+		} else if (expObj instanceof Number expSecond) {
+			expiration = Instant.ofEpochSecond(expSecond.longValue());
+		} else if (expObj != null) {
+			throw new RuntimeException("Unexpected object type for 'exp' claim: " + expObj.getClass().getCanonicalName());
+		} else {
+			expiration = null;
+		}
+		return expiration;
 	}
 }
