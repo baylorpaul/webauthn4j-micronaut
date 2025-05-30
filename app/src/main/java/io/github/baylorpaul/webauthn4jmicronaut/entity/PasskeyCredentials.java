@@ -24,7 +24,6 @@ public class PasskeyCredentials {
 	private @Relation(Relation.Kind.MANY_TO_ONE) User user;
 	/** The Base64Url encoded Passkey/WebAuthn credential ID. This also exists in the "attestedCredentialData" */
 	private @NotBlank String credentialId;
-
 	/**
 	 * The attested credential data (aaguid, credentialId, credentialPublicKey) as a byte array.
 	 * The "aaguid" identifies the model of the authenticator (not the specific instance of the authenticator).
@@ -33,23 +32,20 @@ public class PasskeyCredentials {
 	 * @see <a href="https://www.w3.org/TR/webauthn-1/#sec-attested-credential-data">Attested Credential Data</a>
 	 */
 	private @NotNull byte[] attestedCredentialData;
-
 	/**
 	 * The attestation statement envelope, encoded in CBOR (Concise Binary Object Representation). This includes the
 	 * attestation type (E.g. "direct", "indirect", "none") in the "fmt" key. It also includes the attestation statement
 	 * in the "attStmt" key.
 	 */
 	private @NotNull byte[] attestationStatementEnvelope;
-
-	//private @NotNull AuthenticationExtensionsAuthenticatorOutputs<RegistrationExtensionAuthenticatorOutput> authenticatorExtensions;
-
+	/** the authenticator extensions supported as JSON */
+	private @Nullable String authenticatorExtensions;
 	/** Counter to prevent replay attacks */
 	private long signatureCount;
 	/** Credential type. E.g. "webauthn.create", "webauthn.get" */
 	private @NotNull String type;
-
-	//private @Nullable AuthenticationExtensionsClientOutputs<RegistrationExtensionClientOutput> clientExtensions;
-
+	/** the client extensions supported as JSON */
+	private @Nullable String clientExtensions;
 	/** the transport methods supported. E.g. ["internal","hybrid"] */
 	private @Nullable @TypeDef(type = DataType.STRING_ARRAY) List<String> transports;
 	/** Indicates whether user verification was performed */

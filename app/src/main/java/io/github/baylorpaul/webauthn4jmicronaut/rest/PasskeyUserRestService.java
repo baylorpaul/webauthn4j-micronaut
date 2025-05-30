@@ -367,6 +367,11 @@ public class PasskeyUserRestService implements PasskeyService {
 			throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "missing client data type");
 		}
 
+		ObjectConverter objectConverter = findObjectConverter();
+		// See https://webauthn4j.github.io/webauthn4j/en/#clientextensions
+		String serializedAuthenticatorExtensions = objectConverter.getJsonConverter().writeValueAsString(cred.getAuthenticatorExtensions());
+		String serializedClientExtensions = objectConverter.getJsonConverter().writeValueAsString(cred.getClientExtensions());
+
 		List<String> transportStrs = mapTransportSet(cred.getTransports());
 
 		Boolean uvInitialized = cred.isUvInitialized();
@@ -381,11 +386,11 @@ public class PasskeyUserRestService implements PasskeyService {
 				.attestedCredentialData(attestedCredentialDataBytes)
 				.attestationStatementEnvelope(attestationStatementEnvelope)
 				//.attestationStatement(attestationStatement)
-				//.authenticatorExtensions(authenticatorExtensions)
+				.authenticatorExtensions(serializedAuthenticatorExtensions)
 				.signatureCount(0L)
 				.lastUsedDate(null)
 				.type(clientDataTypeStr)
-				//.clientExtensions(cred.getClientExtensions())
+				.clientExtensions(serializedClientExtensions)
 				.transports(transportStrs)
 				.uvInitialized(uvInitialized != null && uvInitialized.booleanValue())
 				.backupEligible(backupEligible != null && backupEligible.booleanValue())
@@ -640,18 +645,16 @@ public class PasskeyUserRestService implements PasskeyService {
 			throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "invalid credential ID");
 		}
 
-// TODO should this have any other value?
-		//AuthenticationExtensionsAuthenticatorOutputs<RegistrationExtensionAuthenticatorOutput> authenticatorExtensions = pc.getAuthenticatorExtensions();
-		AuthenticationExtensionsAuthenticatorOutputs<RegistrationExtensionAuthenticatorOutput> authenticatorExtensions = new AuthenticationExtensionsAuthenticatorOutputs.BuilderForRegistration()
-				.build();
-
 		CollectedClientData clientData = buildCollectedClientData(pc.getType(), savedAuthenticationChallenge);
 
-// TODO persist this and read it here: String serializedClientExtensions = objectConverter.getJsonConverter().writeValueAsString(clientExtensions);
-//  See https://webauthn4j.github.io/webauthn4j/en/#clientextensions
-		//AuthenticationExtensionsClientOutputs<RegistrationExtensionClientOutput> clientExtensions = pc.getClientExtensions();
-		AuthenticationExtensionsClientOutputs<RegistrationExtensionClientOutput> clientExtensions = new AuthenticationExtensionsClientOutputs.BuilderForRegistration()
-				.build();
+		ObjectConverter objectConverter = findObjectConverter();
+		// See https://webauthn4j.github.io/webauthn4j/en/#clientextensions
+		AuthenticationExtensionsAuthenticatorOutputs<RegistrationExtensionAuthenticatorOutput> authenticatorExtensions = pc.getAuthenticatorExtensions() == null
+				? null
+				: objectConverter.getJsonConverter().readValue(pc.getAuthenticatorExtensions(), AuthenticationExtensionsAuthenticatorOutputs.class);
+		AuthenticationExtensionsClientOutputs<RegistrationExtensionClientOutput> clientExtensions = pc.getClientExtensions() == null
+				? null
+				: objectConverter.getJsonConverter().readValue(pc.getClientExtensions(), AuthenticationExtensionsClientOutputs.class);
 
 		Set<AuthenticatorTransport> transports = mapTransportStrings(pc.getTransports());
 

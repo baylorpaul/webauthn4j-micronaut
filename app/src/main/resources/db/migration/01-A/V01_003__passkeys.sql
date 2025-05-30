@@ -23,8 +23,10 @@ CREATE TABLE public.passkey_credentials
     credential_id                        text NOT NULL,
     attested_credential_data             bytea NOT NULL,
     attestation_statement_envelope       bytea NOT NULL,
+    authenticator_extensions             text,
     signature_count                      bigint NOT NULL,
     type                                 text NOT NULL,
+    client_extensions                    text,
     transports                           text[],
     uv_initialized                       boolean NOT NULL,
     backup_eligible                      boolean NOT NULL,
@@ -43,8 +45,10 @@ COMMENT ON COLUMN public.passkey_credentials.user_id IS 'The user that may authe
 COMMENT ON COLUMN public.passkey_credentials.credential_id IS 'The Base64Url encoded Passkey/WebAuthn credential ID. This also exists in the attested_credential_data.';
 COMMENT ON COLUMN public.passkey_credentials.attested_credential_data IS 'The attested credential data (aaguid, credentialId, credentialPublicKey) as a byte array. The "aaguid" identifies the model of the authenticator (not the specific instance of the authenticator). The "credentialPublicKey" is written to the byte array via CBOR (Concise Binary Object Representation) encoding. No encryption is required, as this is a public key, and the server never has access to the private key. See https://www.w3.org/TR/webauthn-1/#sec-attested-credential-data';
 COMMENT ON COLUMN public.passkey_credentials.attestation_statement_envelope IS 'The attestation statement envelope, encoded in CBOR (Concise Binary Object Representation). This includes the attestation type (E.g. "direct", "indirect", "none") in the "fmt" key. It also includes the attestation statement in the "attStmt" key.';
+COMMENT ON COLUMN public.passkey_credentials.authenticator_extensions IS 'the authenticator extensions supported as JSON';
 COMMENT ON COLUMN public.passkey_credentials.signature_count IS 'Counter to prevent replay attacks';
 COMMENT ON COLUMN public.passkey_credentials.type IS 'Credential type. E.g. "webauthn.create", "webauthn.get"';
+COMMENT ON COLUMN public.passkey_credentials.client_extensions IS 'the client extensions supported as JSON';
 COMMENT ON COLUMN public.passkey_credentials.transports IS 'the transport methods supported. E.g. ["internal","hybrid"]';
 COMMENT ON COLUMN public.passkey_credentials.uv_initialized IS 'Indicates whether user verification was performed';
 COMMENT ON COLUMN public.passkey_credentials.backup_eligible IS 'The value of the Backup Eligibility flag when the public key credential source was created';
