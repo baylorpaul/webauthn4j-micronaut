@@ -47,6 +47,8 @@ dependencies {
     testCompileOnly("org.projectlombok:lombok")
     aotPlugins platform("io.micronaut.platform:micronaut-platform:4.8.2")
     aotPlugins("io.micronaut.security:micronaut-security-aot")
+
+    implementation(project(":library"))
 }
 
 

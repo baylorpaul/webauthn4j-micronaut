@@ -100,6 +100,38 @@
         </processorPath>
         <module name="webauthn4j-micronaut.app.test" />
       </profile>
+      <profile name="Gradle Imported" enabled="true">
+        <outputRelativeToContentRoot value="true" />
+        <option name="micronaut.processing.annotations" value="io.github.baylorpaul.webauthn4jmicronaut.*" />
+        <option name="micronaut.processing.group" value="io.github.baylorpaul.webauthn4jmicronaut" />
+        <option name="micronaut.processing.incremental" value="true" />
+        <option name="micronaut.processing.module" value="library" />
+        <processorPath useClasspath="false">
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.projectlombok/lombok/1.18.38/57f8f5e02e92a30fd21b80cbd426a4172b5f8e29/lombok-1.18.38.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.micronaut/micronaut-inject-java/4.8.11/2c2437e4c0cdd6a62cd5516e68fac9f453015bc4/micronaut-inject-java-4.8.11.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.micronaut/micronaut-core-processor/4.8.11/bb648c8fb91d31fe1ec3943bc647cbcccde34434/micronaut-core-processor-4.8.11.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.micronaut.sourcegen/micronaut-sourcegen-bytecode-writer/1.7.2/b5a2c529e1e6a1b161e8c6d5a11f4da79347fcbd/micronaut-sourcegen-bytecode-writer-1.7.2.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.micronaut.sourcegen/micronaut-sourcegen-model/1.7.2/2eb65fc4f73cce8e16cff0cb4fa75273039b52fe/micronaut-sourcegen-model-1.7.2.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.micronaut/micronaut-graal/4.8.11/42958c8b31636136d1d54c71e48a8a177388d709/micronaut-graal-4.8.11.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.micronaut/micronaut-aop/4.8.11/3e9faef5a16f8e979e9d4c70b704050371bd67c/micronaut-aop-4.8.11.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.micronaut/micronaut-inject/4.8.11/a665fad9b689f4f18da514a9bff19830f83fc2bf/micronaut-inject-4.8.11.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/jakarta.annotation/jakarta.annotation-api/2.1.1/48b9bda22b091b1f48b13af03fe36db3be6e1ae3/jakarta.annotation-api-2.1.1.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.github.javaparser/javaparser-symbol-solver-core/3.26.3/6490adf72d2a1f1b0d2cb8022bb9ad4a67175a01/javaparser-symbol-solver-core-3.26.3.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.micronaut/micronaut-core-reactive/4.8.11/349df58d47723a0e3ccca8bd0590c24017eef294/micronaut-core-reactive-4.8.11.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.reactivestreams/reactive-streams/1.0.4/3864a1320d97d7b045f729a326e1e077661f31b7/reactive-streams-1.0.4.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.micronaut/micronaut-core/4.8.11/81550036dea3303a8ee9b0ab30fc300ecf3a9c00/micronaut-core-4.8.11.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.slf4j/slf4j-api/2.0.16/172931663a09a1fa515567af5fbef00897d3c04/slf4j-api-2.0.16.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.ow2.asm/asm-commons/9.7.1/406c6a2225cfe1819f102a161e54cc16a5c24f75/asm-commons-9.7.1.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.ow2.asm/asm-util/9.7.1/9e23359b598ec6b74b23e53110dd5c577adf2243/asm-util-9.7.1.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.ow2.asm/asm-analysis/9.7.1/f97a3b319f0ed6a8cd944dc79060d3912a28985f/asm-analysis-9.7.1.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.ow2.asm/asm-tree/9.7.1/3a53139787663b139de76b627fca0084ab60d32c/asm-tree-9.7.1.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.ow2.asm/asm/9.7.1/f0ed132a49244b042cd0e15702ab9f2ce3cc8436/asm-9.7.1.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/jakarta.inject/jakarta.inject-api/2.0.1/4c28afe1991a941d7702fe1362c365f0a8641d1e/jakarta.inject-api-2.0.1.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.github.javaparser/javaparser-core/3.26.3/aa91fa91359b1db13695f9c908a2795766ebc9a9/javaparser-core-3.26.3.jar" />
+        </processorPath>
+        <module name="webauthn4j-micronaut.library.test" />
+        <module name="webauthn4j-micronaut.library.main" />
+      </profile>
     </annotationProcessing>
     <bytecodeTargetLevel target="21" />
   </component>
@@ -108,6 +140,9 @@
       <module name="webauthn4j-micronaut.app" options="-parameters -Amicronaut.processing.incremental=true -Amicronaut.processing.annotations=io.github.baylorpaul.webauthn4jmicronaut.* -Amicronaut.processing.group=io.github.baylorpaul.webauthn4jmicronaut -Amicronaut.processing.module=app" />
       <module name="webauthn4j-micronaut.app.main" options="-parameters -Amicronaut.processing.incremental=true -Amicronaut.processing.annotations=io.github.baylorpaul.webauthn4jmicronaut.* -Amicronaut.processing.group=io.github.baylorpaul.webauthn4jmicronaut -Amicronaut.processing.module=app" />
       <module name="webauthn4j-micronaut.app.test" options="-parameters -Amicronaut.processing.incremental=true -Amicronaut.processing.annotations=io.github.baylorpaul.webauthn4jmicronaut.* -Amicronaut.processing.group=io.github.baylorpaul.webauthn4jmicronaut -Amicronaut.processing.module=app" />
+      <module name="webauthn4j-micronaut.library" options="-parameters -Amicronaut.processing.incremental=true -Amicronaut.processing.annotations=io.github.baylorpaul.webauthn4jmicronaut.* -Amicronaut.processing.group=io.github.baylorpaul.webauthn4jmicronaut -Amicronaut.processing.module=library" />
+      <module name="webauthn4j-micronaut.library.main" options="-parameters -Amicronaut.processing.incremental=true -Amicronaut.processing.annotations=io.github.baylorpaul.webauthn4jmicronaut.* -Amicronaut.processing.group=io.github.baylorpaul.webauthn4jmicronaut -Amicronaut.processing.module=library" />
+      <module name="webauthn4j-micronaut.library.test" options="-parameters -Amicronaut.processing.incremental=true -Amicronaut.processing.annotations=io.github.baylorpaul.webauthn4jmicronaut.* -Amicronaut.processing.group=io.github.baylorpaul.webauthn4jmicronaut -Amicronaut.processing.module=library" />
     </option>
   </component>
 </project>
