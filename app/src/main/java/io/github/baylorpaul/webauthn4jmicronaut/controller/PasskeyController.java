@@ -13,12 +13,16 @@ import com.webauthn4j.data.extension.authenticator.AuthenticationExtensionAuthen
 import com.webauthn4j.data.extension.client.AuthenticationExtensionsClientInputs;
 import com.webauthn4j.verifier.exception.VerificationException;
 import io.github.baylorpaul.micronautjsonapi.identifiable.JsonApiResourceable;
+import io.github.baylorpaul.micronautjsonapi.model.JsonApiObject;
 import io.github.baylorpaul.micronautjsonapi.model.JsonApiPage;
+import io.github.baylorpaul.micronautjsonapi.model.JsonApiResource;
 import io.github.baylorpaul.micronautjsonapi.model.JsonApiTopLevelResource;
+import io.github.baylorpaul.micronautjsonapi.util.JsonApiUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialCreationOptionsSessionDto;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialRequestOptionsSessionDto;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyCredentials;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.PasskeyCredentialsRepository;
+import io.github.baylorpaul.webauthn4jmicronaut.rest.PasskeyRestService;
 import io.github.baylorpaul.webauthn4jmicronaut.security.AuthenticationProviderForPreVerifiedCredentials;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyService;
 import io.github.baylorpaul.webauthn4jmicronaut.security.SecurityUtil;
@@ -55,6 +59,7 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import java.security.Principal;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -91,6 +96,9 @@ public class PasskeyController {
 	private PasskeyCredentialsRepository passkeyCredentialsRepo;
 
 	@Inject
+	private PasskeyRestService passkeyRestService;
+
+	@Inject
 	private PasskeyService passkeyService;
 
 	@Inject
@@ -113,6 +121,19 @@ public class PasskeyController {
 		return passkeyCredentialsRepo.findByIdAndUserId(id, SecurityUtil.requireUserId(principal))
 				.map(JsonApiResourceable::toTopLevelResource)
 				.orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Passkey not found"));
+	}
+
+	@Secured(SecurityRule.IS_AUTHENTICATED)
+	@Patch("/{id}")
+	public Optional<JsonApiTopLevelResource> update(
+			long id,
+			Principal principal,
+			@Body JsonApiObject<JsonApiResource> body
+	) {
+		return JsonApiUtil.readAndValidateLongId(body, id)
+				.flatMap(bodyId -> passkeyCredentialsRepo.findByIdAndUserId(id, SecurityUtil.requireUserId(principal)))
+				.map(pc -> passkeyRestService.updatePasskey(pc, body.getData()))
+				.map(JsonApiResourceable::toTopLevelResource);
 	}
 
 	@Secured(SecurityRule.IS_AUTHENTICATED)

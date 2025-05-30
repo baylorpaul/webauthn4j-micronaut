@@ -1,9 +1,6 @@
 package io.github.baylorpaul.webauthn4jmicronaut.controller;
 
-import io.github.baylorpaul.micronautjsonapi.model.JsonApiArray;
-import io.github.baylorpaul.micronautjsonapi.model.JsonApiResource;
-import io.github.baylorpaul.micronautjsonapi.model.JsonApiTopLevelArray;
-import io.github.baylorpaul.micronautjsonapi.model.JsonApiTopLevelResource;
+import io.github.baylorpaul.micronautjsonapi.model.*;
 import io.github.baylorpaul.micronautjsonapi.util.JsonApiUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyCredentials;
 import io.github.baylorpaul.webauthn4jmicronaut.security.jwt.TestCredentialsUtil;
@@ -24,6 +21,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 
@@ -75,7 +73,7 @@ public class PasskeyControllerTest {
 		// Make sure no values are provided that we don't expect. That would be a major security issue.
 
 		// We expect precisely these attributes, and no more.
-		List<String> expectedAttrs = List.of("lastUsedDate", "created", "updated");
+		List<String> expectedAttrs = List.of("lastUsedDate", "comment", "created", "updated");
 		Set<String> attrs = res.getAttributes().keySet();
 		Assertions.assertEquals(expectedAttrs.size(), attrs.size());
 		for (String expectedKey : expectedAttrs) {
@@ -102,15 +100,56 @@ public class PasskeyControllerTest {
 
 	@Test
 	public void testPasskeyCrudOps() {
+		// We're not going to do the C (Create) in CRUD here since Passkeys aren't created by typical API calls.
 		JsonApiArray arr = getPasskeys();
 
 		Assertions.assertEquals(1, arr.size());
 		JsonApiResource res = arr.getFirst();
 		String passkeyId = res.getId();
 
-		//pc = updatePasskey(pc);
-		PasskeyCredentials pc = readPasskey(passkeyId);
+		PasskeyCredentials pc = JsonApiUtil.readResourceWithId(jsonMapper, res, PasskeyCredentials.class)
+				.orElseThrow(() -> new RuntimeException("Expected to find passkey credentials"));
+		Assertions.assertNotNull(pc);
+
+		pc = updatePasskey(pc);
+		pc = readPasskey(passkeyId);
 		deletePasskey(passkeyId);
+	}
+
+	private PasskeyCredentials updatePasskey(PasskeyCredentials pc1) {
+		// Ensure the attributes match expected alternate values from what we're changing them to
+		Assertions.assertNull(pc1.getComment());
+
+		LinkedHashMap<String, Object> attrs = new LinkedHashMap<>();
+		attrs.put("comment", "My iPhone 15 Pro Max");
+
+		JsonApiObject<?> body = JsonApiObject.builder()
+				.data(JsonApiResource.builder()
+						.type(pc1.toResourceType())
+						.id(pc1.toJsonApiId())
+						.attributes(attrs)
+						.build()
+				)
+				.build();
+
+		HttpRequest<?> request = HttpRequest.PATCH("/passkeys/" + pc1.getId(), body)
+				.bearerAuth(testCreds.accessToken());
+
+		HttpResponse<JsonApiTopLevelResource> rsp = client.toBlocking().exchange(request, JsonApiTopLevelResource.class);
+		JsonApiTopLevelResource res = rsp.body();
+		Assertions.assertNotNull(res);
+		Assertions.assertNotNull(res.getData());
+
+		PasskeyCredentials pc = JsonApiUtil.readResourceWithId(jsonMapper, res.getData(), PasskeyCredentials.class)
+				.orElseThrow(() -> new RuntimeException("Expected to find passkey credentials"));
+		Assertions.assertNotNull(pc);
+		Assertions.assertTrue(pc.getId() > 0L);
+		Assertions.assertNotNull(pc.getUser());
+		Assertions.assertEquals(testCreds.userId(), pc.getUser().getId());
+		Assertions.assertNull(pc.getLastUsedDate());
+		Assertions.assertEquals("My iPhone 15 Pro Max", pc.getComment());
+
+		return pc;
 	}
 
 	private PasskeyCredentials readPasskey(String passkeyId) {
