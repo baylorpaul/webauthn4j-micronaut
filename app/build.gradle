@@ -31,7 +31,6 @@ dependencies {
     implementation("jakarta.persistence:jakarta.persistence-api")
     implementation("io.github.baylorpaul:micronaut-json-api:3.0.0")
     implementation("org.springframework.security:spring-security-crypto:6.5.0")
-    implementation("com.webauthn4j:webauthn4j-core:0.29.2.RELEASE")
     compileOnly("io.micronaut:micronaut-http-client")
     compileOnly("org.projectlombok:lombok")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")

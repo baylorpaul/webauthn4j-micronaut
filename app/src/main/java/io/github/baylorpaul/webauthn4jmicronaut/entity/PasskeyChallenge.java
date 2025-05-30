@@ -1,36 +1,29 @@
 package io.github.baylorpaul.webauthn4jmicronaut.entity;
 
-import io.github.baylorpaul.micronautjsonapi.identifiable.JsonApiResourceable;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.ReflectiveAccess;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.annotation.GeneratedValue;
 import io.micronaut.data.annotation.Id;
 import io.micronaut.data.annotation.MappedEntity;
-import io.micronaut.serde.annotation.Serdeable;
-import jakarta.validation.constraints.NotBlank;
+import io.micronaut.data.annotation.Relation;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @MappedEntity
 @Data
 @Builder(toBuilder = true)
-@Serdeable.Deserializable
 @NoArgsConstructor
 @AllArgsConstructor
-@ReflectiveAccess
-public class User implements JsonApiResourceable {
-	@Override
-	public String toResourceType() {
-		return "user";
-	}
-
-	private @Id @GeneratedValue @NonNull long id;
-	private @NotBlank String email;
-	private @NotBlank String name;
+public class PasskeyChallenge {
+	private @Id @NonNull UUID sessionId;
+	private @Nullable @Relation(Relation.Kind.MANY_TO_ONE) PasskeyUserHandle passkeyUserHandle;
+	private @NonNull Instant challengeExpiration;
+	private @NonNull String challenge;
 	private @GeneratedValue Instant created;
 	private @GeneratedValue Instant updated;
 }
