@@ -150,7 +150,6 @@ public class PasskeyUserRestService implements PasskeyService<JsonApiTopLevelRes
 	}
 
 	private static ObjectConverter findObjectConverter() {
-// TODO move this to a bean, and use it in PasskeyController for WebAuthnManager.createNonStrictWebAuthnManager() as well
 		return new ObjectConverter();
 	}
 

@@ -2,6 +2,7 @@ package io.github.baylorpaul.webauthn4jmicronaut.controller;
 
 import com.webauthn4j.WebAuthnManager;
 import com.webauthn4j.converter.exception.DataConversionException;
+import com.webauthn4j.converter.util.ObjectConverter;
 import com.webauthn4j.credential.CredentialRecord;
 import com.webauthn4j.credential.CredentialRecordImpl;
 import com.webauthn4j.data.*;
@@ -499,13 +500,7 @@ public class PasskeyController {
 	 * @see <a href="https://webauthn4j.github.io/webauthn4j/en/#configuration">WebAuthn4J Configuration</a>
 	 */
 	private static WebAuthnManager createWebAuthnManager() {
-/* TODO we can pass an ObjectConverter if we'd like. Do we need a custom ObjectConverter?
-ObjectMapper jsonMapper = new ObjectMapper();
-jsonMapper.registerModule(new WebAuthnMetadataJSONModule());
-jsonMapper.registerModule(new WebAuthn4JSpringSecurityJSONModule());
-ObjectMapper cborMapper = new ObjectMapper(new CBORFactory());
-new ObjectConverter(jsonMapper, cborMapper);
-*/
-		return WebAuthnManager.createNonStrictWebAuthnManager();
+		ObjectConverter objectConverter = new ObjectConverter();
+		return WebAuthnManager.createNonStrictWebAuthnManager(objectConverter);
 	}
 }
