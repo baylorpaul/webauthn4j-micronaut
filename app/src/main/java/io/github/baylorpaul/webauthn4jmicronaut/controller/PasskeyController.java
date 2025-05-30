@@ -12,16 +12,24 @@ import com.webauthn4j.data.client.challenge.DefaultChallenge;
 import com.webauthn4j.data.extension.authenticator.AuthenticationExtensionAuthenticatorOutput;
 import com.webauthn4j.data.extension.client.AuthenticationExtensionsClientInputs;
 import com.webauthn4j.verifier.exception.VerificationException;
+import io.github.baylorpaul.micronautjsonapi.identifiable.JsonApiResourceable;
+import io.github.baylorpaul.micronautjsonapi.model.JsonApiPage;
+import io.github.baylorpaul.micronautjsonapi.model.JsonApiTopLevelResource;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialCreationOptionsSessionDto;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialRequestOptionsSessionDto;
+import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyCredentials;
+import io.github.baylorpaul.webauthn4jmicronaut.repo.PasskeyCredentialsRepository;
 import io.github.baylorpaul.webauthn4jmicronaut.security.AuthenticationProviderForPreVerifiedCredentials;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyService;
+import io.github.baylorpaul.webauthn4jmicronaut.security.SecurityUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.security.model.AuthenticationUserInfo;
 import io.github.baylorpaul.webauthn4jmicronaut.security.model.PasskeyChallengeAndUserHandle;
 import io.github.baylorpaul.webauthn4jmicronaut.service.UserSecurityService;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.annotation.SingleResult;
+import io.micronaut.data.model.Page;
+import io.micronaut.data.model.Pageable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -38,6 +46,7 @@ import io.micronaut.security.handlers.LoginHandler;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.serde.annotation.SerdeImport;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -45,6 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
+import java.security.Principal;
 import java.util.UUID;
 
 /**
@@ -78,6 +88,9 @@ public class PasskeyController {
 	private static final Logger log = LoggerFactory.getLogger(PasskeyController.class);
 
 	@Inject
+	private PasskeyCredentialsRepository passkeyCredentialsRepo;
+
+	@Inject
 	private PasskeyService passkeyService;
 
 	@Inject
@@ -85,6 +98,33 @@ public class PasskeyController {
 
 	@Inject
 	private UserSecurityService userSecurityService;
+
+	@Secured(SecurityRule.IS_AUTHENTICATED)
+	@Get
+	public JsonApiPage<PasskeyCredentials> getPasskeys(Principal principal, @Valid Pageable pageable) {
+		long userId = SecurityUtil.requireUserId(principal);
+		final Page<PasskeyCredentials> page = passkeyCredentialsRepo.findByUserIdEqualsOrderById(userId, pageable);
+		return new JsonApiPage<>(page, null);
+	}
+
+	@Secured(SecurityRule.IS_AUTHENTICATED)
+	@Get("/{id}")
+	public JsonApiTopLevelResource show(long id, Principal principal) {
+		return passkeyCredentialsRepo.findByIdAndUserId(id, SecurityUtil.requireUserId(principal))
+				.map(JsonApiResourceable::toTopLevelResource)
+				.orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Passkey not found"));
+	}
+
+	@Secured(SecurityRule.IS_AUTHENTICATED)
+	@Delete("/{id}")
+	public HttpResponse<?> delete(long id, Principal principal) {
+		return passkeyCredentialsRepo.findByIdAndUserId(id, SecurityUtil.requireUserId(principal))
+				.map(pc -> {
+					passkeyCredentialsRepo.delete(pc);
+					return HttpResponse.noContent();
+				})
+				.orElse(HttpResponse.notFound());
+	}
 
 	/**
 	 * GET WebAuthn passkey registration / attestation options. The important part is that the challenge is returned,
@@ -119,6 +159,8 @@ public class PasskeyController {
 // TODO maybe this shouldn't be a GET request since it has a token? Although the email links to the frontend's web page have to be GET requests with the token.
 		return passkeyService.generateCreationOptionsForExistingAccountAndSaveChallenge(token);
 	}
+
+// TODO API method to add a passkey for an already authenticated user. They still need to reauthenticate like when creating an integration token, and not via an integration token. See SecurityUtil.throwIfNotAccessTokenAuthorization(principal)
 
 	/**
 	 * POST the WebAuthn passkey registration response, whether for a new user or an existing user.

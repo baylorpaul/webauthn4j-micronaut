@@ -13,7 +13,7 @@ import com.webauthn4j.data.extension.authenticator.RegistrationExtensionAuthenti
 import com.webauthn4j.data.extension.client.AuthenticationExtensionsClientOutputs;
 import com.webauthn4j.data.extension.client.CredentialPropertiesOutput;
 import com.webauthn4j.data.extension.client.RegistrationExtensionClientOutput;
-import io.github.baylorpaul.webauthn4jmicronaut.security.jwt.TestCredentialsUtil;
+import io.github.baylorpaul.webauthn4jmicronaut.util.PasskeyTestUtil;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.serde.annotation.SerdeImport;
 import org.junit.jupiter.api.Assertions;
@@ -113,7 +113,7 @@ public class PasskeyTest {
 
 	@Test
 	public void testSerializeCOSEKey() {
-		AttestedCredentialData attestedCredentialData = TestCredentialsUtil.buildFakeAttestedCredentialData();
+		AttestedCredentialData attestedCredentialData = PasskeyTestUtil.buildFakeAttestedCredentialData();
 		COSEKey origCoseKey = attestedCredentialData.getCOSEKey();
 		final EC2COSEKey origEc2CoseKey;
 		if (origCoseKey instanceof EC2COSEKey ec2CoseKey) {

@@ -49,6 +49,8 @@ dependencies {
     aotPlugins("io.micronaut.security:micronaut-security-aot")
 
     implementation(project(":library"))
+    // Allow the test code to access the library's test classes
+    testImplementation project(path: ':library', configuration: 'archives')
 }
 
 

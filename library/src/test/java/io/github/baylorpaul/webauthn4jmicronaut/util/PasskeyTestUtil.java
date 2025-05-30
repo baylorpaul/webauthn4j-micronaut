@@ -1,4 +1,4 @@
-package io.github.baylorpaul.webauthn4jmicronaut.security.jwt;
+package io.github.baylorpaul.webauthn4jmicronaut.util;
 
 import com.webauthn4j.credential.CredentialRecord;
 import com.webauthn4j.credential.CredentialRecordImpl;
@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.NonNull;
 
 import java.util.Set;
 
-public class TestCredentialsUtil {
+public class PasskeyTestUtil {
 
 	public static CredentialRecord buildFakeCredentialRecord(
 			@NonNull String originUrl, @NonNull Challenge savedChallenge

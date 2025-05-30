@@ -45,6 +45,15 @@ tasks.named('jar') {
     }
 }
 
+// Allow the app's test code to access the library's test classes via:
+// testImplementation project(path: ':library', configuration: 'archives')
+tasks.register('libTestJar', Jar) {
+    archiveClassifier.set('tests')
+    from sourceSets.test.output
+}
+artifacts {
+    archives libTestJar
+}
 
 micronaut {
     testRuntime("junit5")

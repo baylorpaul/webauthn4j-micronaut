@@ -1,8 +1,16 @@
 package io.github.baylorpaul.webauthn4jmicronaut.security.jwt;
 
+import com.webauthn4j.credential.CredentialRecord;
+import com.webauthn4j.data.client.challenge.DefaultChallenge;
+import com.webauthn4j.util.Base64UrlUtil;
+import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyUserHandle;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
+import io.github.baylorpaul.webauthn4jmicronaut.repo.PasskeyUserHandleRepository;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.UserRepository;
+import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyConfigurationProperties;
+import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyService;
 import io.github.baylorpaul.webauthn4jmicronaut.util.EmailUtil;
+import io.github.baylorpaul.webauthn4jmicronaut.util.PasskeyTestUtil;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
@@ -10,6 +18,8 @@ import io.micronaut.security.authentication.UsernamePasswordCredentials;
 import io.micronaut.security.token.render.BearerAccessRefreshToken;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+
+import java.security.SecureRandom;
 
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -26,6 +36,15 @@ public class TestCredentialsUtil {
 
 	@Inject
 	private UserRepository userRepo;
+
+	@Inject
+	private PasskeyConfigurationProperties passkeyProps;
+
+	@Inject
+	private PasskeyUserHandleRepository passkeyUserHandleRepo;
+
+	@Inject
+	private PasskeyService passkeyService;
 
 	@Inject
 	@Client("/")
@@ -49,5 +68,31 @@ public class TestCredentialsUtil {
 		assertNotNull(accessToken);
 
 		return accessToken;
+	}
+
+	public void createPasskeyRecord(long userId) {
+		PasskeyUserHandle passkeyUserHandle = createPasskeyUserHandle(userId);
+		String userHandleBase64 = passkeyUserHandle.getId();
+
+		String originUrl = passkeyProps.getOriginUrl();
+		CredentialRecord cred = PasskeyTestUtil.buildFakeCredentialRecord(
+				originUrl,
+				new DefaultChallenge()
+		);
+
+		passkeyService.saveCredential(userHandleBase64, cred);
+	}
+
+	private PasskeyUserHandle createPasskeyUserHandle(long userId) {
+		SecureRandom random = new SecureRandom();
+		byte[] userHandle = new byte[64];
+		random.nextBytes(userHandle);
+
+		User userRef = User.builder().id(userId).build();
+
+		return passkeyUserHandleRepo.save(PasskeyUserHandle.builder()
+				.id(Base64UrlUtil.encodeToString(userHandle))
+				.user(userRef)
+				.build());
 	}
 }
