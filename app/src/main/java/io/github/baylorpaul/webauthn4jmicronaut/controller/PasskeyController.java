@@ -21,6 +21,7 @@ import io.github.baylorpaul.micronautjsonapi.model.JsonApiTopLevelResource;
 import io.github.baylorpaul.micronautjsonapi.util.JsonApiUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialCreationOptionsSessionDto;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialRequestOptionsSessionDto;
+import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.serialization.PasskeyEntityByteArrayIdMixin;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.submission.UserVerificationDto;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyCredentials;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
@@ -75,8 +76,16 @@ import java.util.UUID;
 @SerdeImport.Repeated({
 		@SerdeImport(PublicKeyCredentialCreationOptions.class),
 		@SerdeImport(PublicKeyCredentialRpEntity.class),
-		@SerdeImport(PublicKeyCredentialUserEntity.class),
-		@SerdeImport(PublicKeyCredentialDescriptor.class),
+		@SerdeImport(
+				value = PublicKeyCredentialUserEntity.class,
+				// Serialize the byte array ID to a Base64Url string, instead of a JSON number[]
+				mixin = PasskeyEntityByteArrayIdMixin.class
+		),
+		@SerdeImport(
+				value = PublicKeyCredentialDescriptor.class,
+				// Serialize the byte array ID to a Base64Url string, instead of a JSON number[]
+				mixin = PasskeyEntityByteArrayIdMixin.class
+		),
 		@SerdeImport(DefaultChallenge.class),
 		@SerdeImport(PublicKeyCredentialParameters.class),
 		@SerdeImport(PublicKeyCredentialType.class),
