@@ -16,10 +16,7 @@ import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.*;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,10 +38,9 @@ public class PasskeyControllerTest {
 	@Inject
 	private JsonMapper jsonMapper;
 
-	@BeforeAll
+	@BeforeEach
 	public void init() {
 		this.testCreds = testCredentialsUtil.createTestCreds();
-		testCredentialsUtil.createPasskeyRecord(testCreds.userId());
 	}
 
 	private JsonApiArray getPasskeys() {
@@ -62,6 +58,8 @@ public class PasskeyControllerTest {
 
 	@Test
 	public void testGetPasskeys() {
+		testCredentialsUtil.createPasskeyRecordByUserId(testCreds.userId());
+
 		JsonApiArray arr = getPasskeys();
 
 		Assertions.assertFalse(arr.isEmpty());
@@ -100,6 +98,8 @@ public class PasskeyControllerTest {
 
 	@Test
 	public void testPasskeyCrudOps() {
+		testCredentialsUtil.createPasskeyRecordByUserId(testCreds.userId());
+
 		// We're not going to do the C (Create) in CRUD here since Passkeys aren't created by typical API calls.
 		JsonApiArray arr = getPasskeys();
 

@@ -107,6 +107,16 @@ public interface PasskeyService<C, V> {
 	void updateCounter(byte[] credentialId, long counter) throws HttpStatusException;
 
 	/**
+	 * Find a user handle for an existing user, optionally creating it if it does not exist
+	 * @param generateIfNotFound true if the handle should be generated if it does not exist
+	 * @return the user handle, encoded in Base64Url
+	 * @throws HttpStatusException if the user handle or user does not exist, and the option to create it was false
+	 */
+	@NonNull String findUserHandleBase64Url(
+			@NonNull String userId, boolean generateIfNotFound
+	) throws HttpStatusException;
+
+	/**
 	 * Generate user info for a credential ID
 	 * @return null if the credential ID could not be mapped to a user, else the user info
 	 */

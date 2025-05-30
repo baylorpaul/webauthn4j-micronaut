@@ -251,8 +251,11 @@ public class PasskeyUserRestService implements PasskeyService<JsonApiTopLevelRes
 	private @NonNull PublicKeyCredentialCreationOptionsSessionDto generateCreationOptionsForUserAndSaveChallenge(
 			@NonNull User user
 	) {
-		PasskeyChallenge passkeyChallenge = findOrCreatePasskeyUserHandleForExistingUserWithChallenge(
-				user,
+		long userId = user.getId();
+		PasskeyUserHandle passkeyUserHandle = passkeyUserHandleRepo.findByUserId(userId)
+				.orElseGet(() -> createPasskeyUserHandleForExistingUser(userId));
+		PasskeyChallenge passkeyChallenge = generateChallenge(
+				passkeyUserHandle,
 				REGISTRATION_TIMEOUT.plus(5L, ChronoUnit.SECONDS)
 		);
 		String userHandleBase64Url = passkeyChallenge.getPasskeyUserHandle().getId();
@@ -589,27 +592,20 @@ public class PasskeyUserRestService implements PasskeyService<JsonApiTopLevelRes
 	}
 
 	/**
-	 * Find or create the user handle for an existing user and save the challenge. The user may not already have user
-	 * handle, such as if they don't have a passkey yet.
+	 * Create the user handle for an existing user. Users may not have a user handle, such as if they have never created
+	 * a passkey.
 	 */
-	private PasskeyChallenge findOrCreatePasskeyUserHandleForExistingUserWithChallenge(
-			@NonNull User user, Duration challengeTimeout
-	) {
-		PasskeyUserHandle passkeyUserHandle = passkeyUserHandleRepo.findByUserId(user.getId())
-				.orElseGet(() -> {
-					byte[] userHandle = generateUserHandle();
+	private @NonNull PasskeyUserHandle createPasskeyUserHandleForExistingUser(long userId) {
+		byte[] userHandle = generateUserHandle();
 
-					return passkeyUserHandleRepo.save(PasskeyUserHandle.builder()
-							.id(Base64UrlUtil.encodeToString(userHandle))
-							.user(user)
-							// Don't set the email or name. We already have a user record, and that is the source of truth.
-							.email(null)
-							.name(null)
-							.build()
-					);
-				});
-
-		return generateChallenge(passkeyUserHandle, challengeTimeout);
+		return passkeyUserHandleRepo.save(PasskeyUserHandle.builder()
+				.id(Base64UrlUtil.encodeToString(userHandle))
+				.user(User.builder().id(userId).build())
+				// Don't set the email or name. We already have a user record, and that is the source of truth.
+				.email(null)
+				.name(null)
+				.build()
+		);
 	}
 
 	/**
@@ -764,6 +760,27 @@ public class PasskeyUserRestService implements PasskeyService<JsonApiTopLevelRes
 		return transportStrs == null
 				? null
 				: transportStrs.stream().map(AuthenticatorTransport::create).collect(Collectors.toSet());
+	}
+
+	@Override
+	public @NonNull String findUserHandleBase64Url(
+			@NonNull String userIdStr, boolean generateIfNotFound
+	) throws HttpStatusException {
+		long userId = Long.parseLong(userIdStr);
+		String userHandleBase64Url = passkeyUserHandleRepo.findByUserId(userId)
+				.map(PasskeyUserHandle::getId)
+				.orElseGet(() -> !generateIfNotFound
+						? null
+						: createPasskeyUserHandleForExistingUser(userId).getId()
+				);
+
+		if (userHandleBase64Url == null) {
+			// User is likely trying to re-verify their account via passkeys to take a protected action, but we've
+			// never created a passkey user handle for this user. And that means the user has never had a passkey.
+			throw new HttpStatusException(HttpStatus.NOT_FOUND, "user has never created a passkey");
+		} else {
+			return userHandleBase64Url;
+		}
 	}
 
 	@Override

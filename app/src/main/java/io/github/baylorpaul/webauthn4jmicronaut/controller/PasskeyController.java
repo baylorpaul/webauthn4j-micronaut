@@ -102,9 +102,6 @@ public class PasskeyController {
 	private PasskeyCredentialsRepository passkeyCredentialsRepo;
 
 	@Inject
-	private PasskeyUserHandleRepository passkeyUserHandleRepo;
-
-	@Inject
 	private PasskeyRestService passkeyRestService;
 
 	@Inject
@@ -205,8 +202,9 @@ public class PasskeyController {
 	public PublicKeyCredentialCreationOptionsSessionDto generateRegistrationOptionsAsAuthenticatedUser(
 			Principal principal, @Body UserVerificationDto userVerificationDto
 	) {
-		String userHandleBase64 = findUserHandleBase64(principal);
-		return passkeyService.generateCreationOptionsForUserAndSaveChallenge(userHandleBase64, userVerificationDto);
+		long userId = SecurityUtil.requireUserId(principal);
+		String userHandleBase64Url = passkeyService.findUserHandleBase64Url(String.valueOf(userId), true);
+		return passkeyService.generateCreationOptionsForUserAndSaveChallenge(userHandleBase64Url, userVerificationDto);
 	}
 
 	/**
@@ -281,15 +279,9 @@ public class PasskeyController {
 	@Secured(SecurityRule.IS_AUTHENTICATED)
 	@Get("/methods/generateAuthenticationOptionsAsAuthenticatedUser")
 	public PublicKeyCredentialRequestOptionsSessionDto generateAuthenticationOptionsAsAuthenticatedUser(Principal principal) {
-		String userHandleBase64 = findUserHandleBase64(principal);
-		return passkeyService.generateAuthenticationOptionsAndSaveChallenge(userHandleBase64);
-	}
-
-	private @NonNull String findUserHandleBase64(Principal principal) {
 		long userId = SecurityUtil.requireUserId(principal);
-		return passkeyUserHandleRepo.findByUserId(userId)
-				.map(PasskeyUserHandle::getId)
-				.orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "passkey user handle not found"));
+		String userHandleBase64Url = passkeyService.findUserHandleBase64Url(String.valueOf(userId), false);
+		return passkeyService.generateAuthenticationOptionsAndSaveChallenge(userHandleBase64Url);
 	}
 
 	/**
