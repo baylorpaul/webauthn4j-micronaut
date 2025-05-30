@@ -223,7 +223,7 @@ public class PasskeyUserRestService implements PasskeyService<JsonApiTopLevelRes
 	}
 
 	@Override
-	public @NonNull PublicKeyCredentialCreationOptionsSessionDto generateCreationOptionsForExistingAccountAndSaveChallenge(
+	public @NonNull PublicKeyCredentialCreationOptionsSessionDto generateRegistrationOptionsForExistingAccountAndSaveChallenge(
 			@NotBlank String token
 	) throws HttpStatusException {
 		// Verify the token
@@ -232,7 +232,7 @@ public class PasskeyUserRestService implements PasskeyService<JsonApiTopLevelRes
 	}
 
 	@Override
-	public @NonNull PublicKeyCredentialCreationOptionsSessionDto generateCreationOptionsForUserAndSaveChallenge(
+	public @NonNull PublicKeyCredentialCreationOptionsSessionDto generateRegistrationOptionsForUserAndSaveChallenge(
 			@NonNull String userHandleBase64Url, @NonNull UserVerificationDto userVerificationDto
 	) throws HttpStatusException {
 		PasskeyUserHandle passkeyUserHandle = passkeyUserHandleRepo.findById(userHandleBase64Url)

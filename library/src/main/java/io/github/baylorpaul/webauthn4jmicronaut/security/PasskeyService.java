@@ -33,7 +33,7 @@ public interface PasskeyService<C, V> {
 	 * @param token the short-lived token that was recently issued to the user
 	 * @throws HttpStatusException if the creation options could not be generated
 	 */
-	@NonNull PublicKeyCredentialCreationOptionsSessionDto generateCreationOptionsForExistingAccountAndSaveChallenge(
+	@NonNull PublicKeyCredentialCreationOptionsSessionDto generateRegistrationOptionsForExistingAccountAndSaveChallenge(
 			@NotBlank String token
 	) throws HttpStatusException;
 
@@ -43,7 +43,7 @@ public interface PasskeyService<C, V> {
 	 * @param userVerification information that re-verifies user identity
 	 * @throws HttpStatusException if the creation options could not be generated
 	 */
-	@NonNull PublicKeyCredentialCreationOptionsSessionDto generateCreationOptionsForUserAndSaveChallenge(
+	@NonNull PublicKeyCredentialCreationOptionsSessionDto generateRegistrationOptionsForUserAndSaveChallenge(
 			@NonNull String userHandleBase64Url, @NonNull V userVerification
 	) throws HttpStatusException;
 

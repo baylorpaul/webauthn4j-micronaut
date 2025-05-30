@@ -185,12 +185,12 @@ public class PasskeyController {
 	 * @param token the short-lived token that was recently issued to the user
 	 */
 	@Secured(SecurityRule.IS_ANONYMOUS) // no security
-	@Get("/methods/generateCreationOptionsForExistingAccount")
-	public PublicKeyCredentialCreationOptionsSessionDto generateCreationOptionsForExistingAccount(
+	@Get("/methods/generateRegistrationOptionsForExistingAccount")
+	public PublicKeyCredentialCreationOptionsSessionDto generateRegistrationOptionsForExistingAccount(
 			@NotBlank String token
 	) {
 // TODO maybe this shouldn't be a GET request since it has a token? Although the email links to the frontend's web page have to be GET requests with the token.
-		return passkeyService.generateCreationOptionsForExistingAccountAndSaveChallenge(token);
+		return passkeyService.generateRegistrationOptionsForExistingAccountAndSaveChallenge(token);
 	}
 
 	/**
@@ -204,7 +204,7 @@ public class PasskeyController {
 	) {
 		long userId = SecurityUtil.requireUserId(principal);
 		String userHandleBase64Url = passkeyService.findUserHandleBase64Url(String.valueOf(userId), true);
-		return passkeyService.generateCreationOptionsForUserAndSaveChallenge(userHandleBase64Url, userVerificationDto);
+		return passkeyService.generateRegistrationOptionsForUserAndSaveChallenge(userHandleBase64Url, userVerificationDto);
 	}
 
 	/**
