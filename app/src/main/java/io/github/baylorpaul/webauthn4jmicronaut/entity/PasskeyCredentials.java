@@ -25,12 +25,6 @@ public class PasskeyCredentials {
 	/** The Base64Url encoded Passkey/WebAuthn credential ID. This also exists in the "attestedCredentialData" */
 	private @NotBlank String credentialId;
 
-	///** A unique identifier for the authenticator model */
-	//private @NotNull UUID aaguid;
-
-	///** COSE Key, which contains the public key. COSE = CBOR Object Signing and Encryption. CBOR = Concise Binary Object Representation. */
-	//private @NotNull COSEKey coseKey;
-
 	/**
 	 * The attested credential data (aaguid, credentialId, credentialPublicKey) as a byte array.
 	 * The "aaguid" identifies the model of the authenticator (not the specific instance of the authenticator).
@@ -40,15 +34,12 @@ public class PasskeyCredentials {
 	 */
 	private @NotNull byte[] attestedCredentialData;
 
-	/** Attestation type. E.g. "direct", "indirect", "none" */
-	private @NotNull String attestationType;
-
-	//@JsonTypeInfo(
-	//		use = JsonTypeInfo.Id.NAME,
-	//		include = JsonTypeInfo.As.EXTERNAL_PROPERTY,
-	//		property = "fmt"
-	//)
-	//private @NotNull AttestationStatement attestationStatement;
+	/**
+	 * The attestation statement envelope, encoded in CBOR (Concise Binary Object Representation). This includes the
+	 * attestation type (E.g. "direct", "indirect", "none") in the "fmt" key. It also includes the attestation statement
+	 * in the "attStmt" key.
+	 */
+	private @NotNull byte[] attestationStatementEnvelope;
 
 	//private @NotNull AuthenticationExtensionsAuthenticatorOutputs<RegistrationExtensionAuthenticatorOutput> authenticatorExtensions;
 
@@ -71,9 +62,4 @@ public class PasskeyCredentials {
 	private @Nullable Instant lastUsedDate;
 	private @GeneratedValue Instant created;
 	private @GeneratedValue Instant updated;
-
-	//@JsonProperty("fmt")
-	//public @NotNull String getFormat() {
-	//	return attestationStatement.getFormat();
-	//}
 }

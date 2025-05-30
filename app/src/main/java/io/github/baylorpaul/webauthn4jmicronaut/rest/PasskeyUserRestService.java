@@ -8,7 +8,6 @@ import com.webauthn4j.data.*;
 import com.webauthn4j.data.attestation.authenticator.AttestedCredentialData;
 import com.webauthn4j.data.attestation.statement.AttestationStatement;
 import com.webauthn4j.data.attestation.statement.COSEAlgorithmIdentifier;
-import com.webauthn4j.data.attestation.statement.NoneAttestationStatement;
 import com.webauthn4j.data.client.ClientDataType;
 import com.webauthn4j.data.client.CollectedClientData;
 import com.webauthn4j.data.client.Origin;
@@ -31,6 +30,7 @@ import io.github.baylorpaul.webauthn4jmicronaut.repo.PasskeyCredentialsRepositor
 import io.github.baylorpaul.webauthn4jmicronaut.repo.PasskeyUserHandleRepository;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyConfigurationProperties;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyService;
+import io.github.baylorpaul.webauthn4jmicronaut.security.model.AttestationStatementEnvelope;
 import io.github.baylorpaul.webauthn4jmicronaut.security.model.PasskeyChallengeAndUserHandle;
 import io.github.baylorpaul.webauthn4jmicronaut.service.SystemService;
 import io.github.baylorpaul.webauthn4jmicronaut.util.ApiUtil;
@@ -43,7 +43,6 @@ import io.micronaut.transaction.annotation.Transactional;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -357,10 +356,10 @@ public class PasskeyUserRestService implements PasskeyService {
 		passkeyUserHandle = passkeyUserHandleRepo.update(passkeyUserHandle);
 
 		AttestationStatement attestationStatement = cred.getAttestationStatement();
-		AttestationConveyancePreference attestationType = attestationStatement == null ? null : AttestationConveyancePreference.create(attestationStatement.getFormat());
-		// Validate that the attestation type is supported
-		validateAndMapAttestationTypeToAttestationStatement(attestationType);
-		String attestationTypeString = attestationType == null ? null : attestationType.getValue();
+		if (attestationStatement == null) {
+			throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "missing attestation statement");
+		}
+		byte[] attestationStatementEnvelope = serializeAttestationStatementEnvelope(attestationStatement);
 
 		CollectedClientData clientData = cred.getClientData();
 		String clientDataTypeStr = clientData == null ? null : clientData.getType().getValue();
@@ -380,7 +379,7 @@ public class PasskeyUserRestService implements PasskeyService {
 				//.aaguid(attestedCredentialData.getAaguid().getValue())
 				//.coseKey(attestedCredentialData.getCOSEKey())
 				.attestedCredentialData(attestedCredentialDataBytes)
-				.attestationType(attestationTypeString)
+				.attestationStatementEnvelope(attestationStatementEnvelope)
 				//.attestationStatement(attestationStatement)
 				//.authenticatorExtensions(authenticatorExtensions)
 				.signatureCount(0L)
@@ -558,31 +557,35 @@ public class PasskeyUserRestService implements PasskeyService {
 	}
 
 	/**
-	 * Convert an attestation type to an attestation statement. This only supports some types. Alternatively, use
-	 * serialization as described at the provided link.
-	 * @throws HttpStatusException if the type could not be mapped to a statement
+	 * Serialize the attestation type and attestation statement in an "envelope", encoded in CBOR (Concise Binary Object
+	 * Representation).
 	 * @see <a href="https://webauthn4j.github.io/webauthn4j/en/#attestationstatement">attestationStatement</a>
 	 * @see <a href="https://www.w3.org/TR/webauthn-1/#sctn-attestation">Attestation</a>
 	 * @see <a href="https://www.w3.org/TR/webauthn-1/#sctn-attestation-types">Attestation Types</a>
 	 */
-	protected static @NotNull AttestationStatement validateAndMapAttestationTypeToAttestationStatement(
-			@Nullable AttestationConveyancePreference attestationType
+	private @NonNull byte[] serializeAttestationStatementEnvelope(@NonNull AttestationStatement attestationStatement) {
+		ObjectConverter objectConverter = findObjectConverter();
+		AttestationStatementEnvelope envelope = new AttestationStatementEnvelope(attestationStatement);
+		return objectConverter.getCborConverter().writeValueAsBytes(envelope);
+	}
+
+	/**
+	 * Deserialize the attestation type and attestation statement from an "envelope", encoded in CBOR (Concise Binary
+	 * Object Representation).
+	 * @throws HttpStatusException if the attestation statement could not be deserialized
+	 * @see <a href="https://webauthn4j.github.io/webauthn4j/en/#attestationstatement">attestationStatement</a>
+	 * @see <a href="https://www.w3.org/TR/webauthn-1/#sctn-attestation">Attestation</a>
+	 * @see <a href="https://www.w3.org/TR/webauthn-1/#sctn-attestation-types">Attestation Types</a>
+	 */
+	private @NonNull AttestationStatement deserializeAttestationStatementEnvelope(
+			@NonNull byte[] serializedEnvelope
 	) throws HttpStatusException {
-		if (attestationType == null) {
-			throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "missing attestation type");
+		ObjectConverter objectConverter = findObjectConverter();
+		AttestationStatementEnvelope envelope = objectConverter.getCborConverter().readValue(serializedEnvelope, AttestationStatementEnvelope.class);
+		if (envelope == null || envelope.getAttestationStatement() == null) {
+			throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "invalid attestation statement envelope");
 		}
-
-// TODO consider instead using serialization described at https://webauthn4j.github.io/webauthn4j/en/#attestationstatement
-
-		switch (attestationType.getValue()) {
-			case "none":
-				return new NoneAttestationStatement();
-			case "indirect":
-			case "direct":
-			case "enterprise":
-			default:
-				throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "unsupported attestation type");
-		}
+		return envelope.getAttestationStatement();
 	}
 
 	/**
@@ -623,9 +626,8 @@ public class PasskeyUserRestService implements PasskeyService {
 	private CredentialRecord translateToCredentialRecord(PasskeyCredentials pc, Challenge savedAuthenticationChallenge) throws HttpStatusException {
 		byte[] attestedCredentialId = Base64UrlUtil.decode(pc.getCredentialId());
 
-		String attestationTypeString = pc.getAttestationType();
-		AttestationConveyancePreference attestationType = AttestationConveyancePreference.create(attestationTypeString);
-		AttestationStatement attestationStatement = validateAndMapAttestationTypeToAttestationStatement(attestationType);
+		byte[] attestationStatementEnvelope = pc.getAttestationStatementEnvelope();
+		AttestationStatement attestationStatement = deserializeAttestationStatementEnvelope(attestationStatementEnvelope);
 
 		// Decode the attested credential data byte array according to https://www.w3.org/TR/webauthn-1/#sec-attested-credential-data
 		AttestedCredentialDataConverter attestedCredentialDataConverter = findAttestedCredentialDataConverter();
