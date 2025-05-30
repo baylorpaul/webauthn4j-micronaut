@@ -292,19 +292,6 @@ public class PasskeyUserRestService implements PasskeyService {
 	public @NonNull RegistrationParameters loadRegistrationParametersForVerification(
 			@NonNull RegistrationData registrationData, @NonNull Challenge savedRegistrationChallenge
 	) throws HttpStatusException {
-// TODO maybe remove the "registrationData" parameter
-/* TODO none of this is probably needed
-		AttestationObject attestationObject = registrationData.getAttestationObject();
-		if (attestationObject == null) {
-			throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "attestation object not found");
-		}
-		AttestedCredentialData attestedCredentialData = attestationObject.getAuthenticatorData().getAttestedCredentialData();
-		if (attestedCredentialData == null) {
-			throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "attested credential data not found");
-		}
-		byte[] credentialId = attestedCredentialData.getCredentialId();
-*/
-
 		ServerProperty serverProperty = buildServerPropertiesForVerification(savedRegistrationChallenge);
 
 		// A parameter indicating whether user verification, such as biometrics or PIN confirmation on the
@@ -384,11 +371,8 @@ public class PasskeyUserRestService implements PasskeyService {
 		PasskeyCredentials pc = PasskeyCredentials.builder()
 				.user(user)
 				.credentialId(base64UrlCredentialId)
-				//.aaguid(attestedCredentialData.getAaguid().getValue())
-				//.coseKey(attestedCredentialData.getCOSEKey())
 				.attestedCredentialData(attestedCredentialDataBytes)
 				.attestationStatementEnvelope(attestationStatementEnvelope)
-				//.attestationStatement(attestationStatement)
 				.authenticatorExtensions(serializedAuthenticatorExtensions)
 				.signatureCount(0L)
 				.lastUsedDate(null)
