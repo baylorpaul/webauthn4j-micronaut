@@ -15,3 +15,7 @@ A [WebAuthn](https://webauthn.io/)/Passkeys library for [Micronaut](https://micr
 While the "library" is ready to use, the "app" source code is a sample only.
 Notice that AuthenticationProviderUserPassword.java does NOT check the password.
 Please implement your own solution if modeling after the app.
+
+### Email
+Email is not implemented in the sample app. The basic contents are logged instead.
+See MailTemplateService.java

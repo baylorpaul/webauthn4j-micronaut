@@ -21,6 +21,7 @@ dependencies {
     annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
     //implementation("io.micrometer:context-propagation")
     implementation("io.micronaut.data:micronaut-data-jdbc")
+    implementation("io.micronaut.email:micronaut-email-template")
     implementation("io.micronaut.flyway:micronaut-flyway")
     implementation("io.micronaut.reactor:micronaut-reactor")
     implementation("io.micronaut.security:micronaut-security-jwt")
