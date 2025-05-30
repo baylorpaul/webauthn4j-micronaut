@@ -19,8 +19,10 @@ import com.webauthn4j.data.extension.authenticator.RegistrationExtensionAuthenti
 import com.webauthn4j.data.extension.client.*;
 import com.webauthn4j.server.ServerProperty;
 import com.webauthn4j.util.Base64UrlUtil;
+import io.github.baylorpaul.micronautjsonapi.model.JsonApiTopLevelResource;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialCreationOptionsSessionDto;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialRequestOptionsSessionDto;
+import io.github.baylorpaul.webauthn4jmicronaut.dto.api.submission.UserVerificationDto;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyChallenge;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyCredentials;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyUserHandle;
@@ -55,7 +57,7 @@ import java.util.stream.Collectors;
 
 @Singleton
 @Transactional
-public class PasskeyUserRestService implements PasskeyService {
+public class PasskeyUserRestService implements PasskeyService<JsonApiTopLevelResource, UserVerificationDto> {
 
 	/**
 	 * The timeout between retrieving registration options and verification. This indicates the time the calling web app
@@ -110,6 +112,9 @@ public class PasskeyUserRestService implements PasskeyService {
 
 	@Inject
 	private PasskeyChallengeRepository passkeyChallengeRepo;
+
+	@Inject
+	private SecurityRestService securityRestService;
 
 	@Inject
 	private UserRepository userRepo;
@@ -223,7 +228,29 @@ public class PasskeyUserRestService implements PasskeyService {
 	) throws HttpStatusException {
 		// Verify the token
 		User user = userRestService.validateJwtClaimsForPasskeyAddition(token);
+		return generateCreationOptionsForUserAndSaveChallenge(user);
+	}
 
+	@Override
+	public @NonNull PublicKeyCredentialCreationOptionsSessionDto generateCreationOptionsForUserAndSaveChallenge(
+			@NonNull String userHandleBase64Url, @NonNull UserVerificationDto userVerificationDto
+	) throws HttpStatusException {
+		PasskeyUserHandle passkeyUserHandle = passkeyUserHandleRepo.findById(userHandleBase64Url)
+				.orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "passkey user handle not found"));
+
+		if (passkeyUserHandle.getUser() == null) {
+			throw new HttpStatusException(HttpStatus.NOT_FOUND, "passkey user handle not associated with a user");
+		} else {
+			long userId = passkeyUserHandle.getUser().getId();
+			User user = securityRestService.findUserAndValidateCredentials(userId, userVerificationDto);
+
+			return generateCreationOptionsForUserAndSaveChallenge(user);
+		}
+	}
+
+	private @NonNull PublicKeyCredentialCreationOptionsSessionDto generateCreationOptionsForUserAndSaveChallenge(
+			@NonNull User user
+	) {
 		PasskeyChallenge passkeyChallenge = findOrCreatePasskeyUserHandleForExistingUserWithChallenge(
 				user,
 				REGISTRATION_TIMEOUT.plus(5L, ChronoUnit.SECONDS)
@@ -235,7 +262,7 @@ public class PasskeyUserRestService implements PasskeyService {
 
 		// "excludeCredentials" is a list of existing credentials' IDs to prevent duplicating a passkey from the passkey
 		// provider. I.e. Prevent users from re-registering existing authenticators
-		List<PublicKeyCredentialDescriptor> excludeCredentials = findPreviouslyRegisteredAuthenticators(credUser);
+		List<PublicKeyCredentialDescriptor> excludeCredentials = findPreviouslyRegisteredAuthenticators(userHandleBase64Url);
 
 		return generateCreationOptionsAndSaveChallenge(credUser, excludeCredentials, passkeyChallenge);
 	}
@@ -330,7 +357,7 @@ public class PasskeyUserRestService implements PasskeyService {
 	}
 
 	@Override
-	public void saveCredential(
+	public JsonApiTopLevelResource saveCredential(
 			@NonNull String userHandleBase64Url, @NonNull CredentialRecord cred
 	) throws HttpStatusException {
 		AttestedCredentialData attestedCredentialData = cred.getAttestedCredentialData();
@@ -409,10 +436,14 @@ public class PasskeyUserRestService implements PasskeyService {
 				.build();
 
 		pc = passkeyCredentialsRepo.save(pc);
+
+		return pc.toTopLevelResource();
 	}
 
 	@Override
-	public @NonNull PublicKeyCredentialRequestOptionsSessionDto generateAuthenticationOptionsAndSaveChallenge() throws HttpStatusException {
+	public @NonNull PublicKeyCredentialRequestOptionsSessionDto generateAuthenticationOptionsAndSaveChallenge(
+			@Nullable String userHandleBase64Url
+	) throws HttpStatusException {
 
 		// We can't find a user because we want the browser to be able to invoke this API method without providing any
 		// information so that it can autofill the input.
@@ -421,13 +452,14 @@ public class PasskeyUserRestService implements PasskeyService {
 		PublicKeyCredentialRpEntity rp = buildPublicKeyCredentialRpEntity();
 
 		// "allowCredentials" is an array of acceptable credentials for this authentication. If non-empty, it requires
-		// users to use a previously-registered authenticator. Pass an empty array to let the user select an available
+		// users to use a previously registered authenticator. Pass an empty array to let the user select an available
 		// passkey from a list shown by the browser.
-// TODO when authenticating while already logged in, we may want to provide values for this list. E.g. if authenticating in order to create an integration token
 		List<PublicKeyCredentialDescriptor> allowCredentials = List.of();
-		//if (credUser != null) {
-		//	allowCredentials = passkeyService.findPreviouslyRegisteredAuthenticators(credUser);
-		//}
+		if (userHandleBase64Url != null) {
+			// The user is authenticated, so we're likely re-verifying their identity to take a protected action, such
+			// as creating an integration token.
+			allowCredentials = findPreviouslyRegisteredAuthenticators(userHandleBase64Url);
+		}
 
 		List<PublicKeyCredentialHints> hints = null;
 		AuthenticationExtensionsClientInputs<AuthenticationExtensionClientInput> extensions = null;
@@ -470,10 +502,13 @@ public class PasskeyUserRestService implements PasskeyService {
 		ServerProperty serverProperty = buildServerPropertiesForVerification(savedAuthenticationChallenge);
 		CredentialRecord credentialRecord = translateToCredentialRecord(pc, savedAuthenticationChallenge);
 
+		String userHandleBase64Url = Base64UrlUtil.encodeToString(authenticationData.getUserHandle());
+		List<PublicKeyCredentialDescriptor> allowCredentials = findPreviouslyRegisteredAuthenticators(userHandleBase64Url);
+
 		// expectations
-// TODO set "allowCredentials". When authenticating while already logged in, we may want to provide values for this
-//  list. E.g. if authenticating in order to create an integration token
-		List<byte[]> allowCredentials = null;
+		List<byte[]> allowCredentialIds = allowCredentials == null
+				? null
+				: allowCredentials.stream().map(PublicKeyCredentialDescriptor::getId).toList();
 		boolean userVerificationRequired = true;
 		boolean userPresenceRequired = true;
 
@@ -483,7 +518,7 @@ public class PasskeyUserRestService implements PasskeyService {
 		return new AuthenticationParameters(
 				serverProperty,
 				credentialRecord,
-				allowCredentials,
+				allowCredentialIds,
 				userVerificationRequired,
 				userPresenceRequired
 		);
@@ -636,9 +671,8 @@ public class PasskeyUserRestService implements PasskeyService {
 	 * @see <a href="https://www.w3.org/TR/webauthn-1/#dictdef-publickeycredentialdescriptor">Credential Descriptor (dictionary PublicKeyCredentialDescriptor)</a>
 	 */
 	private @Nullable List<PublicKeyCredentialDescriptor> findPreviouslyRegisteredAuthenticators(
-			@NonNull PublicKeyCredentialUserEntity credUser
+			@NonNull String userHandleBase64Url
 	) throws HttpStatusException {
-		String userHandleBase64Url = Base64UrlUtil.encodeToString(credUser.getId());
 
 		List<PasskeyCredentials> passkeyCredentials = passkeyCredentialsRepo.findByUserHandle(userHandleBase64Url);
 		return passkeyCredentials.stream()

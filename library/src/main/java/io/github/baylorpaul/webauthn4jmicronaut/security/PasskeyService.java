@@ -17,7 +17,7 @@ import jakarta.validation.constraints.NotBlank;
 
 import java.util.UUID;
 
-public interface PasskeyService {
+public interface PasskeyService<C, V> {
 
 	/**
 	 * Generate registration options, persist the challenge, and generate a session ID for registration verification
@@ -35,6 +35,16 @@ public interface PasskeyService {
 	 */
 	@NonNull PublicKeyCredentialCreationOptionsSessionDto generateCreationOptionsForExistingAccountAndSaveChallenge(
 			@NotBlank String token
+	) throws HttpStatusException;
+
+	/**
+	 * Generate passkey creation options for adding a passkey to an existing user that is authenticated, and persist the
+	 * challenge
+	 * @param userVerification information that re-verifies user identity
+	 * @throws HttpStatusException if the creation options could not be generated
+	 */
+	@NonNull PublicKeyCredentialCreationOptionsSessionDto generateCreationOptionsForUserAndSaveChallenge(
+			@NonNull String userHandleBase64Url, @NonNull V userVerification
 	) throws HttpStatusException;
 
 	/**
@@ -63,16 +73,21 @@ public interface PasskeyService {
 	 * ID. If the user handle ID is not yet associated with a user, create the user.
 	 * @param userHandleBase64Url the user handle, encoded in Base64Url. This is required because the API does not retain
 	 *            any session to link the generated registration options to the verification.
+	 * @return the saved credential
 	 * @throws HttpStatusException if the credentials could not be persisted
 	 */
-	void saveCredential(@NonNull String userHandleBase64Url, @NonNull CredentialRecord credentialRecord) throws HttpStatusException;
+	C saveCredential(@NonNull String userHandleBase64Url, @NonNull CredentialRecord credentialRecord) throws HttpStatusException;
 
 	/**
 	 * Generate authentication options, persist the challenge, and generate a session ID for authentication verification
+	 * @param userHandleBase64Url null if the user is not authenticated, else the user handle, encoded in Base64Url. If
+	 *            provided, this may be used to provide additional information, such as "allowCredentials" values.
 	 * @throws HttpStatusException if the authentication options could not be generated
 	 */
 	@NonNull
-	PublicKeyCredentialRequestOptionsSessionDto generateAuthenticationOptionsAndSaveChallenge() throws HttpStatusException;
+	PublicKeyCredentialRequestOptionsSessionDto generateAuthenticationOptionsAndSaveChallenge(
+			@Nullable String userHandleBase64Url
+	) throws HttpStatusException;
 
 	/**
 	 * For verification, load the authentication parameters.

@@ -1,5 +1,6 @@
 package io.github.baylorpaul.webauthn4jmicronaut.rest;
 
+import io.github.baylorpaul.webauthn4jmicronaut.dto.api.submission.UserVerificationDto;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.UtilizedConfirmationToken;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.UserRepository;
@@ -10,6 +11,8 @@ import io.github.baylorpaul.webauthn4jmicronaut.security.validator.ConfirmationJ
 import io.github.baylorpaul.webauthn4jmicronaut.service.LockService;
 import io.github.baylorpaul.webauthn4jmicronaut.service.SystemService;
 import io.github.baylorpaul.webauthn4jmicronaut.service.model.enums.ConfirmationType;
+import io.github.baylorpaul.webauthn4jmicronaut.util.PasswordUtil;
+import io.github.baylorpaul.webauthn4jmicronaut.util.Utility;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpStatus;
@@ -19,6 +22,8 @@ import io.micronaut.transaction.annotation.Transactional;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import jakarta.validation.constraints.NotBlank;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.Map;
@@ -27,6 +32,8 @@ import java.util.Optional;
 @Singleton
 @Transactional
 public class SecurityRestService {
+
+	private static final Logger log = LoggerFactory.getLogger(SecurityRestService.class);
 
 	@Inject
 	private ConfirmationJsonWebTokenValidator<?> confirmationJsonWebTokenValidator;
@@ -44,6 +51,61 @@ public class SecurityRestService {
 	private LockService lockService;
 
 	private record UserAndExpiration(@NonNull User user, @Nullable Instant tokenExpirationDate) {}
+
+	public @NonNull User findUserAndValidateCredentials(long userId, @NonNull UserVerificationDto userVerification) {
+		User user = userRepo.findById(userId)
+				.orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+		validateAuthentication(
+				user,
+				userVerification,
+				"Authentication info missing"
+		);
+
+		return user;
+	}
+
+	/**
+	 * Re-authenticate the user so they may take a protected action that requires re-verifying their identity.
+	 * E.g. associating a federated login with their pre-existing account, adding an integration token, changing their
+	 * password, or adding another passkey to their account.
+	 */
+	public void validateAuthentication(
+			@NonNull User user, @NonNull UserVerificationDto userVerification,
+			@NotBlank String defaultErrorMessage
+	) {
+		boolean authenticated = false;
+		if (!Utility.isEmptyTrimmed(userVerification.getJwtPasskeyAccessVerifiedToken())) {
+			// Verify the short-lived confirmation token granted after passkey re-authentication
+			User userFromToken = findUserIfValidConfirmationToken(
+					userVerification.getJwtPasskeyAccessVerifiedToken(),
+					ConfirmationType.PASSKEY_ACCESS_VERIFIED,
+					true
+			);
+			if (userFromToken.getId() == user.getId()) {
+				authenticated = true;
+			} else {
+				throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "passkey confirmation token does not match user");
+			}
+		} else if (!Utility.isEmptyTrimmed(userVerification.getPassword())) {
+
+			// TODO a better password implementation, such as is commented out
+
+			//if (user.getPassword() == null) {
+			//	throw new HttpStatusException(HttpStatus.FORBIDDEN, "Cannot verify via password match. User does not have an associated password.");
+			//} else if (bCryptPasswordEncoderService.matches(userVerification.getPassword(), user.getPassword())) {
+			//	authenticated = true;
+			//} else {
+			//	throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "Invalid password");
+			//}
+
+			authenticated = PasswordUtil.passwordMatches(userVerification.getPassword(), user);
+		}
+
+		if (!authenticated) {
+			throw new HttpStatusException(HttpStatus.UNAUTHORIZED, defaultErrorMessage);
+		}
+	}
 
 	private @NonNull UserAndExpiration validateConfirmationTokenAndFindUser(
 			@NonNull Authentication auth, @NonNull ConfirmationType expectedConfirmationType
@@ -64,14 +126,18 @@ public class SecurityRestService {
 	}
 
 	/**
+	 * Check that the claims from the token match the expected values, the claim is not expired, and the user is
+	 * enabled.
 	 * @param subjectToTokenInvalidation true if the token should be invalidated for later use when the token
 	 *            confirmation type does not allow token reuse. This may be false while gathering information before the
 	 *            action is taking place.
+	 * @return the non-null user associated with the token
+	 * @throws HttpStatusException if the JWT could not be verified
 	 */
 	public @NonNull User findUserIfValidConfirmationToken(
 			@NonNull @NotBlank String token, @NonNull ConfirmationType expectedConfirmationType,
 			boolean subjectToTokenInvalidation
-	) {
+	) throws HttpStatusException {
 		Authentication auth = SecurityUtil.validateConfirmationJwt(confirmationJsonWebTokenValidator, token)
 				.orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, "invalid token"));
 

@@ -11,10 +11,11 @@ A [WebAuthn](https://webauthn.io/)/Passkeys library for [Micronaut](https://micr
 
 ## Notes
 
-### SECURITY WARNING!
+### MAJOR SECURITY WARNING!
 While the "library" is ready to use, the "app" source code is a sample only.
-Notice that AuthenticationProviderUserPassword.java does NOT check the password.
+Notice that PasswordUtil.java DOES NOT check a user's password.
 Please implement your own solution if modeling after the app.
+The password is always "topsecret".
 
 ### Email
 Email is not implemented in the sample app. The basic contents are logged instead.

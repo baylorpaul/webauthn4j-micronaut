@@ -11,6 +11,7 @@ import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyConfigurationPro
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyService;
 import io.github.baylorpaul.webauthn4jmicronaut.util.EmailUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.PasskeyTestUtil;
+import io.github.baylorpaul.webauthn4jmicronaut.util.PasswordUtil;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
@@ -29,7 +30,7 @@ public class TestCredentialsUtil {
 
 	public static final String TEST_EMAIL = "mrwilliams@example.com";
 	public static final String TEST_NAME = "Mister Williams";
-	public static final String TEST_PASSWORD = "dream-satchel-tortilla";
+	public static final String TEST_PASSWORD = PasswordUtil.FAKE_PASSWORD;
 
 	/** Credentials for a test */
 	public record TestCreds(long userId, String accessToken) {}

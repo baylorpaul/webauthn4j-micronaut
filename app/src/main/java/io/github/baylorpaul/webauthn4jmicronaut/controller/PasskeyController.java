@@ -20,8 +20,13 @@ import io.github.baylorpaul.micronautjsonapi.model.JsonApiTopLevelResource;
 import io.github.baylorpaul.micronautjsonapi.util.JsonApiUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialCreationOptionsSessionDto;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialRequestOptionsSessionDto;
+import io.github.baylorpaul.webauthn4jmicronaut.dto.api.submission.UserVerificationDto;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyCredentials;
+import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyUserHandle;
+import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.PasskeyCredentialsRepository;
+import io.github.baylorpaul.webauthn4jmicronaut.repo.PasskeyUserHandleRepository;
+import io.github.baylorpaul.webauthn4jmicronaut.repo.UserRepository;
 import io.github.baylorpaul.webauthn4jmicronaut.rest.PasskeyRestService;
 import io.github.baylorpaul.webauthn4jmicronaut.security.AuthenticationProviderForPreVerifiedCredentials;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyService;
@@ -29,6 +34,7 @@ import io.github.baylorpaul.webauthn4jmicronaut.security.SecurityUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.security.model.AuthenticationUserInfo;
 import io.github.baylorpaul.webauthn4jmicronaut.security.model.PasskeyChallengeAndUserHandle;
 import io.github.baylorpaul.webauthn4jmicronaut.service.UserSecurityService;
+import io.github.baylorpaul.webauthn4jmicronaut.service.UserService;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.annotation.SingleResult;
@@ -96,13 +102,22 @@ public class PasskeyController {
 	private PasskeyCredentialsRepository passkeyCredentialsRepo;
 
 	@Inject
+	private PasskeyUserHandleRepository passkeyUserHandleRepo;
+
+	@Inject
 	private PasskeyRestService passkeyRestService;
 
 	@Inject
-	private PasskeyService passkeyService;
+	private PasskeyService<JsonApiTopLevelResource, UserVerificationDto> passkeyService;
 
 	@Inject
 	private LoginHandler<HttpRequest<?>, MutableHttpResponse<?>> loginHandler;
+
+	@Inject
+	private UserRepository userRepo;
+
+	@Inject
+	private UserService userService;
 
 	@Inject
 	private UserSecurityService userSecurityService;
@@ -181,18 +196,30 @@ public class PasskeyController {
 		return passkeyService.generateCreationOptionsForExistingAccountAndSaveChallenge(token);
 	}
 
-// TODO API method to add a passkey for an already authenticated user. They still need to reauthenticate like when creating an integration token, and not via an integration token. See SecurityUtil.throwIfNotAccessTokenAuthorization(principal)
+	/**
+	 * POST to get WebAuthn passkey registration / attestation options for adding to an authenticated user's account.
+	 * This is a POST instead of a GET because it contains sensitive information for re-verifying the account.
+	 */
+	@Secured(SecurityRule.IS_AUTHENTICATED)
+	@Post("/methods/generateRegistrationOptionsAsAuthenticatedUser")
+	public PublicKeyCredentialCreationOptionsSessionDto generateRegistrationOptionsAsAuthenticatedUser(
+			Principal principal, @Body UserVerificationDto userVerificationDto
+	) {
+		String userHandleBase64 = findUserHandleBase64(principal);
+		return passkeyService.generateCreationOptionsForUserAndSaveChallenge(userHandleBase64, userVerificationDto);
+	}
 
 	/**
 	 * POST the WebAuthn passkey registration response, whether for a new user or an existing user.
 	 * @param challengeSessionId the session ID associated with the recently issued challenge. This is required because
 	 *            the API does not retain a session to link the generated registration options to the verification.
+	 * @return the saved credential
 	 * @see <a href="https://developers.google.com/identity/passkeys/developer-guides/server-registration#store_the_public_key">Store the public key</a>
 	 */
 	@Secured(SecurityRule.IS_ANONYMOUS) // no security
 	@Post("/methods/verifyRegistration")
 	@Status(HttpStatus.CREATED)
-	public void verifyRegistration(
+	public JsonApiTopLevelResource verifyRegistration(
 			@NonNull @Header("X-Challenge-Session-ID") UUID challengeSessionId,
 			@NonNull @Body String registrationResponseJSON
 	) {
@@ -233,7 +260,7 @@ public class PasskeyController {
 		);
 		// Persist the credential record, and associate it with the user handle. This may be for a new or existing user.
 		// The credential record will be needed during the authentication process.
-		passkeyService.saveCredential(userHandleBase64Url, credentialRecord);
+		return passkeyService.saveCredential(userHandleBase64Url, credentialRecord);
 	}
 
 	/**
@@ -243,57 +270,44 @@ public class PasskeyController {
 	@Secured(SecurityRule.IS_ANONYMOUS) // no security
 	@Get("/methods/generateAuthenticationOptions")
 	public PublicKeyCredentialRequestOptionsSessionDto generateAuthenticationOptions() {
-		return passkeyService.generateAuthenticationOptionsAndSaveChallenge();
+		return passkeyService.generateAuthenticationOptionsAndSaveChallenge(null);
+	}
+
+	/**
+	 * GET WebAuthn passkey authentication options as an already authenticated user.
+	 * The authentication options shall include "allowCredentials" values, if available.
+	 * @see <a href="https://developers.google.com/identity/passkeys/developer-guides/server-authentication#create_credential_request_options">Create credential request options</a>
+	 */
+	@Secured(SecurityRule.IS_AUTHENTICATED)
+	@Get("/methods/generateAuthenticationOptionsAsAuthenticatedUser")
+	public PublicKeyCredentialRequestOptionsSessionDto generateAuthenticationOptionsAsAuthenticatedUser(Principal principal) {
+		String userHandleBase64 = findUserHandleBase64(principal);
+		return passkeyService.generateAuthenticationOptionsAndSaveChallenge(userHandleBase64);
+	}
+
+	private @NonNull String findUserHandleBase64(Principal principal) {
+		long userId = SecurityUtil.requireUserId(principal);
+		return passkeyUserHandleRepo.findByUserId(userId)
+				.map(PasskeyUserHandle::getId)
+				.orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "passkey user handle not found"));
 	}
 
 	/**
 	 * POST the WebAuthn passkey authentication response.
-	 * Return a JWT access token, refresh token, etc.
+	 * @return a JWT access token, refresh token, etc.
+	 * @see <a href="https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.4">Access Token Response</a>
 	 * @see <a href="https://developers.google.com/identity/passkeys/developer-guides/server-authentication#verify_and_sign_in_the_user">Verify and sign in the user</a>
 	 */
 	@Secured(SecurityRule.IS_ANONYMOUS) // no security
-	@Post("/methods/verifyAuthentication")
+	@Post("/methods/verifyAuthenticationForAccessTokenResponse")
 	@SingleResult
-	public Mono<MutableHttpResponse<?>> verifyAuthentication(
+	public Mono<MutableHttpResponse<?>> verifyAuthenticationForAccessTokenResponse(
 			@NonNull @Header("X-Challenge-Session-ID") UUID challengeSessionId,
 			@NonNull @Body String authenticationResponseJSON,
 			HttpRequest<?> request
 	) {
 		try {
-			WebAuthnManager webAuthnManager = createWebAuthnManager();
-
-			AuthenticationData authenticationData;
-			try {
-				authenticationData = webAuthnManager.parseAuthenticationResponseJSON(authenticationResponseJSON);
-			} catch (DataConversionException e) {
-				// Caught a WebAuthn data structure parse error
-				throw new HttpStatusException(HttpStatus.BAD_REQUEST, "unexpected data structure");
-			}
-
-			final AuthenticatorData<AuthenticationExtensionAuthenticatorOutput> authenticatorData = authenticationData.getAuthenticatorData();
-			if (authenticatorData == null) {
-				throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "invalid authenticator data");
-			}
-
-			PasskeyChallengeAndUserHandle challengeAndUserHandle = passkeyService.findNonNullChallengeAndDiscard(challengeSessionId);
-			Challenge savedAuthenticationChallenge = challengeAndUserHandle.getChallenge();
-
-			AuthenticationParameters authenticationParameters = passkeyService.loadAuthenticationParametersForVerification(authenticationData, savedAuthenticationChallenge);
-
-			try {
-				// The challenge will be verified here
-				webAuthnManager.verify(authenticationData, authenticationParameters);
-			} catch (VerificationException e) {
-				// Caught a WebAuthn data validation error
-				log.warn("Invalid passkey credentials while verifying authentication: {}", e.getMessage());
-				throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials and/or signature");
-			}
-
-			// Update the counter of the authenticator record
-			passkeyService.updateCounter(authenticationData.getCredentialId(), authenticatorData.getSignCount());
-
-			byte[] credentialId = authenticationParameters.getAuthenticator().getAttestedCredentialData().getCredentialId();
-			AuthenticationUserInfo userInfo = passkeyService.generateAuthenticationUserInfo(credentialId);
+			AuthenticationUserInfo userInfo = verifyAuthentication(challengeSessionId, authenticationResponseJSON);
 
 			Mono<MutableHttpResponse<?>> result = createJwtAccessKey(userInfo, request);
 			return result;
@@ -301,6 +315,90 @@ public class PasskeyController {
 			userSecurityService.publishLoginFailed(null, AuthenticationResponse.failure(e.getMessage()), request);
 			throw e;
 		}
+	}
+
+	/**
+	 * POST the WebAuthn passkey authentication response as an already authenticated user.
+	 * @param principal the authenticated user. Because the objective of this method is to verify passkey
+	 *            authentication, the "principal" is not absolutely required in theory, but this method is intended to
+	 *            only be used for users that are already authenticated.
+	 * @return a short-lived "passkey access verified" JWT confirmation token. This may be used to take a protected
+	 *         action that requires confirming user access. E.g. adding an integration token, changing a user's
+	 *         password, or adding another passkey to the user's account.
+	 */
+	@Secured(SecurityRule.IS_AUTHENTICATED)
+	@Post("/methods/verifyAuthenticationAsAuthenticatedUserForConfirmationTokenResponse")
+	public String verifyAuthenticationAsAuthenticatedUserForConfirmationTokenResponse(
+			Principal principal,
+			@NonNull @Header("X-Challenge-Session-ID") UUID challengeSessionId,
+			@NonNull @Body String authenticationResponseJSON,
+			HttpRequest<?> request
+	) {
+		long userId = SecurityUtil.requireUserId(principal);
+		User user = userRepo.findById(userId)
+				.orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "User not found"));
+		String userIdStr = String.valueOf(user.getId());
+
+		try {
+			AuthenticationUserInfo userInfo = verifyAuthentication(challengeSessionId, authenticationResponseJSON);
+
+			if (userInfo == null) {
+				throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "No matching credentials");
+			} else if (!userInfo.getUserId().equals(userIdStr)) {
+				// Ensure the credentials in the authentication response match the authenticated User
+				throw new HttpStatusException(HttpStatus.FORBIDDEN, "Credentials for wrong user");
+			}
+
+			String passkeyAccessVerifiedToken = userService.generatePasskeyAccessVerifiedConfirmationToken(user);
+			return passkeyAccessVerifiedToken;
+		} catch (RuntimeException e) {
+			userSecurityService.publishLoginFailed(null, AuthenticationResponse.failure(e.getMessage()), request);
+			throw e;
+		}
+	}
+
+	/**
+	 * Verify the WebAuthn passkey authentication response, and return the authentication user information.
+	 * @return the credential ID for the passkey
+	 * @throws HttpStatusException if the authentication fails verification
+	 */
+	private @Nullable AuthenticationUserInfo verifyAuthentication(
+			UUID challengeSessionId, String authenticationResponseJSON
+	) throws HttpStatusException {
+		WebAuthnManager webAuthnManager = createWebAuthnManager();
+
+		AuthenticationData authenticationData;
+		try {
+			authenticationData = webAuthnManager.parseAuthenticationResponseJSON(authenticationResponseJSON);
+		} catch (DataConversionException e) {
+			// Caught a WebAuthn data structure parse error
+			throw new HttpStatusException(HttpStatus.BAD_REQUEST, "unexpected data structure");
+		}
+
+		final AuthenticatorData<AuthenticationExtensionAuthenticatorOutput> authenticatorData = authenticationData.getAuthenticatorData();
+		if (authenticatorData == null) {
+			throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "invalid authenticator data");
+		}
+
+		PasskeyChallengeAndUserHandle challengeAndUserHandle = passkeyService.findNonNullChallengeAndDiscard(challengeSessionId);
+		Challenge savedAuthenticationChallenge = challengeAndUserHandle.getChallenge();
+
+		AuthenticationParameters authenticationParameters = passkeyService.loadAuthenticationParametersForVerification(authenticationData, savedAuthenticationChallenge);
+
+		try {
+			// The challenge will be verified here
+			webAuthnManager.verify(authenticationData, authenticationParameters);
+		} catch (VerificationException e) {
+			// Caught a WebAuthn data validation error
+			log.warn("Invalid passkey credentials while verifying authentication: {}", e.getMessage());
+			throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials and/or signature");
+		}
+
+		// Update the counter of the authenticator record
+		passkeyService.updateCounter(authenticationData.getCredentialId(), authenticatorData.getSignCount());
+
+		byte[] credentialId = authenticationParameters.getAuthenticator().getAttestedCredentialData().getCredentialId();
+		return passkeyService.generateAuthenticationUserInfo(credentialId);
 	}
 
 	/**

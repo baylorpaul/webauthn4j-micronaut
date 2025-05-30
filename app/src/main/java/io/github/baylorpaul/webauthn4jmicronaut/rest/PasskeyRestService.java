@@ -35,7 +35,7 @@ public class PasskeyRestService {
 						if (Utility.unNull(dto.getPasskeyName()).length() > MAX_CHARS_PASSKEY_NAME) {
 							throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Field too long (max=" + MAX_CHARS_PASSKEY_NAME + "): " + key);
 						}
-						ApiUtil.setNonEmptyStr(key, dto.getPasskeyName(), pc::setPasskeyName);
+						pc.setPasskeyName(dto.getPasskeyName());
 						break;
 					default:
 						throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Unexpected field: " + key);

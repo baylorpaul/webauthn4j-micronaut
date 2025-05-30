@@ -3,6 +3,7 @@ package io.github.baylorpaul.webauthn4jmicronaut.security;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.UserRepository;
 import io.github.baylorpaul.webauthn4jmicronaut.util.EmailUtil;
+import io.github.baylorpaul.webauthn4jmicronaut.util.PasswordUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
@@ -34,11 +35,9 @@ public class AuthenticationProviderUserPassword implements HttpRequestAuthentica
 		email = EmailUtil.formatEmailAddress(email);
 		User user = email == null ? null : userRepo.findByEmail(email).orElse(null);
 
-		// TODO check that the "rawPassword" matches the user's password.
-		//  See https://guides.micronaut.io/latest/micronaut-database-authentication-provider-gradle-groovy.html#authentication-provider
-		log.error("There is NO SECURITY for password matching! Any value is accepted as valid.");
+		// TODO a better implementation. See https://guides.micronaut.io/latest/micronaut-database-authentication-provider-gradle-groovy.html#authentication-provider
 		String rawPassword = authenticationRequest.getSecret().toString();
-		boolean passwordMatches = true;
+		boolean passwordMatches = PasswordUtil.passwordMatches(rawPassword, user);
 
 		if (passwordMatches) {
 			return AuthenticationResponse.success(

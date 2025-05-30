@@ -30,6 +30,8 @@ public class UserService {
 
 	/** the number of seconds a user has to add a passkey after they are sent a passkey reset email */
 	private static final int PASSKEY_ADDITION_EXPIRATION_SECONDS = Long.valueOf(Duration.ofMinutes(10L).toSeconds()).intValue();
+	/** the number of seconds a user has to take an action after they re-authenticate via passkey */
+	private static final int PASSKEY_ACCESS_VERIFIED_EXPIRATION_SECONDS = Long.valueOf(Duration.ofMinutes(5L).toSeconds()).intValue();
 
 	@Inject
 	private ApplicationConfigurationProperties appProps;
@@ -46,7 +48,7 @@ public class UserService {
 	@Inject
 	private MailTemplateService mailTemplateService;
 
-	public String generateConfirmationJwt(User user, ConfirmationRequest confReq) {
+	public @NonNull String generateConfirmationJwt(User user, ConfirmationRequest confReq) {
 		return generateSignedJwtForConfirmationRequest(user, confReq)
 				.map(AccessRefreshToken::getAccessToken)
 				.orElseThrow(() -> new RuntimeException("Unable to generate a confirmation token"));
@@ -76,6 +78,15 @@ public class UserService {
 		Contact contact = new Contact(user.getEmail(), user.getName());
 
 		return buildPasskeyAdditionLinkEmailTemplate(addPasskeyUriPathWithoutToken, confirmationToken, contact, confReq.getExpirationSeconds().intValue() / 60);
+	}
+
+	public @NonNull String generatePasskeyAccessVerifiedConfirmationToken(User user) {
+		ConfirmationRequest confReq = ConfirmationRequest.builder()
+				.type(ConfirmationType.PASSKEY_ACCESS_VERIFIED)
+				.email(user.getEmail())
+				.expirationSeconds(PASSKEY_ACCESS_VERIFIED_EXPIRATION_SECONDS)
+				.build();
+		return generateConfirmationJwt(user, confReq);
 	}
 
 	/**
