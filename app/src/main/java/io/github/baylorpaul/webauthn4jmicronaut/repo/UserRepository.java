@@ -18,8 +18,8 @@ public interface UserRepository extends PageableRepository<User, Long> {
 	Optional<User> findByEmail(@NonNull @NotBlank String email);
 
 	@Transactional(propagation = TransactionDefinition.Propagation.REQUIRES_NEW)
-	@Query("INSERT INTO public.user(email, name)" +
-			" SELECT :email, :name" +
+	@Query("INSERT INTO public.user(email, name, enabled)" +
+			" SELECT :email, :name, true" +
 			" WHERE NOT EXISTS(SELECT id FROM public.user WHERE email = :email)")
 	void saveUserIfNotExists(@NonNull @NotBlank String email, @NonNull @NotBlank String name);
 }

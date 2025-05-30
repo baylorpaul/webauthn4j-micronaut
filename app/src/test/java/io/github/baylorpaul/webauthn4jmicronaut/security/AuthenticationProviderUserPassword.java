@@ -1,6 +1,5 @@
 package io.github.baylorpaul.webauthn4jmicronaut.security;
 
-import com.nimbusds.jwt.JWTClaimNames;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.UserRepository;
 import io.github.baylorpaul.webauthn4jmicronaut.util.EmailUtil;
@@ -17,8 +16,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 @Singleton
 public class AuthenticationProviderUserPassword implements HttpRequestAuthenticationProvider<HttpRequest<?>> {
@@ -48,22 +45,10 @@ public class AuthenticationProviderUserPassword implements HttpRequestAuthentica
 					Long.toString(user.getId()),
 					Collections.emptyList(),
 					// Even though we used BASIC authorization to get here, we are providing future authorization via an access token
-					buildJwtClaims(user)
+					TokenUtil.buildJwtClaims(user)
 			);
 		} else {
 			return AuthenticationResponse.failure(AuthenticationFailureReason.CREDENTIALS_DO_NOT_MATCH);
 		}
-	}
-
-	public static Map<String, Object> buildJwtClaims(@NonNull User user) {
-		Map<String, Object> attributes = new LinkedHashMap<>();
-
-		// Override "sub". This is the ServerAuthentication.name otherwise.
-		// The "sub" becomes the "name" on the Principal
-		attributes.put(JWTClaimNames.SUBJECT, Long.toString(user.getId()));
-
-		attributes.put("email", user.getEmail());
-		attributes.put("name", user.getName());
-		return attributes;
 	}
 }

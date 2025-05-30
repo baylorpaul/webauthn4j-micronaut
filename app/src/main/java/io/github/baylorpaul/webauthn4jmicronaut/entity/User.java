@@ -31,6 +31,7 @@ public class User implements JsonApiResourceable {
 	private @Id @GeneratedValue @NonNull long id;
 	private @NotBlank String email;
 	private @NotBlank String name;
+	private boolean enabled;
 	private @GeneratedValue Instant created;
 	private @GeneratedValue Instant updated;
 }

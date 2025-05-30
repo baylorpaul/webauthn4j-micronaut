@@ -28,9 +28,12 @@ import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.PasskeyChallengeRepository;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.PasskeyCredentialsRepository;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.PasskeyUserHandleRepository;
+import io.github.baylorpaul.webauthn4jmicronaut.repo.UserRepository;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyConfigurationProperties;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyService;
+import io.github.baylorpaul.webauthn4jmicronaut.security.TokenUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.security.model.AttestationStatementEnvelope;
+import io.github.baylorpaul.webauthn4jmicronaut.security.model.AuthenticationUserInfo;
 import io.github.baylorpaul.webauthn4jmicronaut.security.model.PasskeyChallengeAndUserHandle;
 import io.github.baylorpaul.webauthn4jmicronaut.service.SystemService;
 import io.github.baylorpaul.webauthn4jmicronaut.util.ApiUtil;
@@ -47,10 +50,7 @@ import jakarta.validation.constraints.NotBlank;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Singleton
@@ -110,6 +110,9 @@ public class PasskeyUserRestService implements PasskeyService {
 
 	@Inject
 	private PasskeyChallengeRepository passkeyChallengeRepo;
+
+	@Inject
+	private UserRepository userRepo;
 
 	@Inject
 	private SystemService systemService;
@@ -695,6 +698,30 @@ public class PasskeyUserRestService implements PasskeyService {
 		return transportStrs == null
 				? null
 				: transportStrs.stream().map(AuthenticatorTransport::create).collect(Collectors.toSet());
+	}
+
+	@Override
+	public @Nullable AuthenticationUserInfo generateAuthenticationUserInfo(byte[] credentialId) {
+		String base64UrlCredentialId = Base64UrlUtil.encodeToString(credentialId);
+
+		User user = passkeyCredentialsRepo.findByCredentialId(base64UrlCredentialId)
+				.flatMap(pc -> userRepo.findById(pc.getUser().getId()))
+				.orElse(null);
+
+		if (user == null) {
+			return null;
+		} else {
+			// Even though we did not use an access token authorization to get here, we want to provide future
+			// authorization via an access token
+			Map<String, Object> jwtClaims = TokenUtil.buildJwtClaims(user);
+
+			return new AuthenticationUserInfo(
+					String.valueOf(user.getId()),
+					user.isEnabled(),
+					null,
+					jwtClaims
+			);
+		}
 	}
 
 	@Override

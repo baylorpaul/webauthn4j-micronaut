@@ -14,27 +14,36 @@ import com.webauthn4j.data.extension.client.AuthenticationExtensionsClientInputs
 import com.webauthn4j.verifier.exception.VerificationException;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialCreationOptionsSessionDto;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialRequestOptionsSessionDto;
+import io.github.baylorpaul.webauthn4jmicronaut.security.AuthenticationProviderForPreVerifiedCredentials;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyService;
+import io.github.baylorpaul.webauthn4jmicronaut.security.model.AuthenticationUserInfo;
 import io.github.baylorpaul.webauthn4jmicronaut.security.model.PasskeyChallengeAndUserHandle;
+import io.github.baylorpaul.webauthn4jmicronaut.service.UserSecurityService;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.annotation.ReflectiveAccess;
+import io.micronaut.core.async.annotation.SingleResult;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
+import io.micronaut.security.authentication.Authentication;
+import io.micronaut.security.authentication.AuthenticationRequest;
+import io.micronaut.security.authentication.AuthenticationResponse;
+import io.micronaut.security.handlers.LoginHandler;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.serde.annotation.SerdeImport;
-import io.micronaut.serde.annotation.Serdeable;
 import jakarta.inject.Inject;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
@@ -71,14 +80,11 @@ public class PasskeyController {
 	@Inject
 	private PasskeyService passkeyService;
 
-	@Data
-	@Serdeable
-	@ReflectiveAccess
-	@NoArgsConstructor
-	@AllArgsConstructor
-	public static class PasskeyVerification {
-		private boolean verified;
-	}
+	@Inject
+	private LoginHandler<HttpRequest<?>, MutableHttpResponse<?>> loginHandler;
+
+	@Inject
+	private UserSecurityService userSecurityService;
 
 	/**
 	 * GET WebAuthn passkey registration / attestation options. The important part is that the challenge is returned,
@@ -108,7 +114,8 @@ public class PasskeyController {
 	 */
 	@Secured(SecurityRule.IS_ANONYMOUS) // no security
 	@Post("/methods/verifyRegistration")
-	public PasskeyVerification verifyRegistration(
+	@Status(HttpStatus.CREATED)
+	public void verifyRegistration(
 			@NonNull @Header("X-Challenge-Session-ID") UUID challengeSessionId,
 			@NonNull @Body String registrationResponseJSON
 	) {
@@ -150,8 +157,6 @@ public class PasskeyController {
 		// Persist the credential record, and associate it with the user handle. This may be for a new or existing user.
 		// The credential record will be needed during the authentication process.
 		passkeyService.saveCredential(userHandleBase64Url, credentialRecord);
-
-		return new PasskeyVerification(true);
 	}
 
 	/**
@@ -165,49 +170,96 @@ public class PasskeyController {
 	}
 
 	/**
-	 * POST the WebAuthn passkey authentication response
+	 * POST the WebAuthn passkey authentication response.
+	 * Return a JWT access token, refresh token, etc.
 	 * @see <a href="https://developers.google.com/identity/passkeys/developer-guides/server-authentication#verify_and_sign_in_the_user">Verify and sign in the user</a>
 	 */
 	@Secured(SecurityRule.IS_ANONYMOUS) // no security
 	@Post("/methods/verifyAuthentication")
-	public PasskeyVerification verifyAuthentication(
+	@SingleResult
+	public Mono<MutableHttpResponse<?>> verifyAuthentication(
 			@NonNull @Header("X-Challenge-Session-ID") UUID challengeSessionId,
-			@NonNull @Body String authenticationResponseJSON
+			@NonNull @Body String authenticationResponseJSON,
+			HttpRequest<?> request
 	) {
-		WebAuthnManager webAuthnManager = createWebAuthnManager();
-
-		AuthenticationData authenticationData;
 		try {
-			authenticationData = webAuthnManager.parseAuthenticationResponseJSON(authenticationResponseJSON);
-		} catch (DataConversionException e) {
-			// Caught a WebAuthn data structure parse error
-			throw new HttpStatusException(HttpStatus.BAD_REQUEST, "unexpected data structure");
+			WebAuthnManager webAuthnManager = createWebAuthnManager();
+
+			AuthenticationData authenticationData;
+			try {
+				authenticationData = webAuthnManager.parseAuthenticationResponseJSON(authenticationResponseJSON);
+			} catch (DataConversionException e) {
+				// Caught a WebAuthn data structure parse error
+				throw new HttpStatusException(HttpStatus.BAD_REQUEST, "unexpected data structure");
+			}
+
+			final AuthenticatorData<AuthenticationExtensionAuthenticatorOutput> authenticatorData = authenticationData.getAuthenticatorData();
+			if (authenticatorData == null) {
+				throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "invalid authenticator data");
+			}
+
+			PasskeyChallengeAndUserHandle challengeAndUserHandle = passkeyService.findNonNullChallengeAndDiscard(challengeSessionId);
+			Challenge savedAuthenticationChallenge = challengeAndUserHandle.getChallenge();
+
+			AuthenticationParameters authenticationParameters = passkeyService.loadAuthenticationParametersForVerification(authenticationData, savedAuthenticationChallenge);
+
+			try {
+				// The challenge will be verified here
+				webAuthnManager.verify(authenticationData, authenticationParameters);
+			} catch (VerificationException e) {
+				// Caught a WebAuthn data validation error
+				log.warn("Invalid passkey credentials while verifying authentication: {}", e.getMessage());
+				throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials and/or signature");
+			}
+
+			// Update the counter of the authenticator record
+			passkeyService.updateCounter(authenticationData.getCredentialId(), authenticatorData.getSignCount());
+
+			byte[] credentialId = authenticationParameters.getAuthenticator().getAttestedCredentialData().getCredentialId();
+			AuthenticationUserInfo userInfo = passkeyService.generateAuthenticationUserInfo(credentialId);
+
+			Mono<MutableHttpResponse<?>> result = createJwtAccessKey(userInfo, request);
+			return result;
+		} catch (HttpStatusException e) {
+			userSecurityService.publishLoginFailed(null, AuthenticationResponse.failure(e.getMessage()), request);
+			throw e;
 		}
+	}
 
-		final AuthenticatorData<AuthenticationExtensionAuthenticatorOutput> authenticatorData = authenticationData.getAuthenticatorData();
-		if (authenticatorData == null) {
-			throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "invalid authenticator data");
-		}
+	/**
+	 * After having verified the passkey credentials, generate a JWT access key for authentication.
+	 */
+	private Mono<MutableHttpResponse<?>> createJwtAccessKey(AuthenticationUserInfo userInfo, HttpRequest<?> request) {
+		return AuthenticationProviderForPreVerifiedCredentials.generateAuthenticationResponseForPreVerifiedCredentials(userInfo)
+				.map(authenticationResponse -> {
+					// Similar to Micronaut Security's io.micronaut.security.endpoints.LoginController, except we're not
+					// going to implement an HttpRequestAuthenticationProvider, since we don't want that to execute
+					// under any other circumstances.
 
-		PasskeyChallengeAndUserHandle challengeAndUserHandle = passkeyService.findNonNullChallengeAndDiscard(challengeSessionId);
-		Challenge savedAuthenticationChallenge = challengeAndUserHandle.getChallenge();
+					if (authenticationResponse.isAuthenticated() && authenticationResponse.getAuthentication().isPresent()) {
+						Authentication authentication = authenticationResponse.getAuthentication().get();
+						userSecurityService.publishLoginSuccess(authentication, request);
+						return loginHandler.loginSuccess(authentication, request);
+					} else {
+						log.warn("passkey login failed for userId: {}", userInfo == null ? null : userInfo.getUserId());
 
-		AuthenticationParameters authenticationParameters = passkeyService.loadAuthenticationParametersForVerification(authenticationData, savedAuthenticationChallenge);
+						userSecurityService.publishLoginFailed(
+								userInfo == null ? null : new UserIdAuthenticationRequest(userInfo.getUserId(), null),
+								authenticationResponse,
+								request
+						);
 
-		try {
-			// The challenge will be verified here
-			webAuthnManager.verify(authenticationData, authenticationParameters);
-		} catch (VerificationException e) {
-			// Caught a WebAuthn data validation error
-			log.warn("Invalid passkey credentials while verifying authentication: {}", e.getMessage());
-			throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials and/or signature");
-		}
+						return loginHandler.loginFailed(authenticationResponse, request);
+					}
+				})
+				.switchIfEmpty(Mono.defer(() -> Mono.just(HttpResponse.status(HttpStatus.UNAUTHORIZED))));
+	}
 
-		// Update the counter of the authenticator record
-		passkeyService.updateCounter(authenticationData.getCredentialId(), authenticatorData.getSignCount());
-
-// TODO return a User object instead, or whatever is necessary to log the user in
-		return new PasskeyVerification(true);
+	@Getter
+	@AllArgsConstructor
+	private static class UserIdAuthenticationRequest implements AuthenticationRequest<String, String> {
+		private String identity;
+		private String secret;
 	}
 
 	/**

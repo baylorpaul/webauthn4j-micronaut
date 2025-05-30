@@ -8,6 +8,7 @@ import com.webauthn4j.data.RegistrationParameters;
 import com.webauthn4j.data.client.challenge.Challenge;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialCreationOptionsSessionDto;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialRequestOptionsSessionDto;
+import io.github.baylorpaul.webauthn4jmicronaut.security.model.AuthenticationUserInfo;
 import io.github.baylorpaul.webauthn4jmicronaut.security.model.PasskeyChallengeAndUserHandle;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -79,6 +80,13 @@ public interface PasskeyService {
 	 * @throws HttpStatusException if the credentials could not be updated
 	 */
 	void updateCounter(byte[] credentialId, long counter) throws HttpStatusException;
+
+	/**
+	 * Generate user info for a credential ID
+	 * @return null if the credential ID could not be mapped to a user, else the user info
+	 */
+	@Nullable
+	AuthenticationUserInfo generateAuthenticationUserInfo(byte[] credentialId);
 
 	/**
 	 * Remove expired challenges and unattached user handles.

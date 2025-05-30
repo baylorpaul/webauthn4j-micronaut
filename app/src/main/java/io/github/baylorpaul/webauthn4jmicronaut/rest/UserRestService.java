@@ -43,6 +43,7 @@ public class UserRestService {
 				User.builder()
 						.email(formattedEmail)
 						.name(formattedDisplayName)
+						.enabled(true)
 						.build()
 		);
 

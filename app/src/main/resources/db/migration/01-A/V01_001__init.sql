@@ -21,6 +21,7 @@ CREATE TABLE public.user
 	id                                   BIGSERIAL,
 	email                                varchar(256) NOT NULL,
 	name                                 varchar(256) NOT NULL,
+    enabled                              boolean NOT NULL,
     created                              timestamptz NOT NULL,
     updated                              timestamptz NOT NULL,
 	CONSTRAINT pk_user                   PRIMARY KEY(id)
@@ -30,6 +31,7 @@ CREATE TABLE public.user
 COMMENT ON TABLE public.user IS 'A user of the platform';
 COMMENT ON COLUMN public.user.email IS 'The email address for the user';
 COMMENT ON COLUMN public.user.name IS 'The name of the user';
+COMMENT ON COLUMN public.user.enabled IS 'true if the user is currently enabled';
 
 --------------------------------------------------------------------------------
 -- Sequence Alteration
