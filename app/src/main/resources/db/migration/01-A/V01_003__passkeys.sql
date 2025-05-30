@@ -32,7 +32,7 @@ CREATE TABLE public.passkey_credentials
     backup_eligible                      boolean NOT NULL,
     backup_state                         boolean NOT NULL,
     last_used_date                       timestamptz,
-    comment                              varchar(256),
+    passkey_name                         varchar(20),
     created                              timestamptz NOT NULL,
     updated                              timestamptz NOT NULL,
     CONSTRAINT pk_passkey_credentials  PRIMARY KEY(id),
@@ -55,7 +55,7 @@ COMMENT ON COLUMN public.passkey_credentials.uv_initialized IS 'Indicates whethe
 COMMENT ON COLUMN public.passkey_credentials.backup_eligible IS 'The value of the Backup Eligibility flag when the public key credential source was created';
 COMMENT ON COLUMN public.passkey_credentials.backup_state IS 'Whether the public key credential source is currently backed up';
 COMMENT ON COLUMN public.passkey_credentials.last_used_date IS 'Timestamp for last usage of the credential in an authentication process';
-COMMENT ON COLUMN public.passkey_credentials.comment IS 'An optional free-form comment to further note the usage of the passkey. E.g. a label to help users distinguish between devices, such as "MacBook Pro" or "Work Phone"';
+COMMENT ON COLUMN public.passkey_credentials.passkey_name IS 'An optional free-form name or comment to further describe the usage of the passkey. E.g. a label to help users distinguish between devices, such as "MacBook Pro" or "Work Phone"';
 
 
 CREATE TABLE public.passkey_user_handle

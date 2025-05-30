@@ -18,7 +18,7 @@ import jakarta.inject.Singleton;
 @Transactional
 public class PasskeyRestService {
 
-	private static final int MAX_CHARS_COMMENT = 256;
+	private static final int MAX_CHARS_PASSKEY_NAME = 20;
 
 	@Inject
 	private PasskeyCredentialsRepository passkeyCredentialsRepo;
@@ -31,11 +31,11 @@ public class PasskeyRestService {
 			PasskeyCredentials dto = JsonApiUtil.readValue(jsonMapper, res.getAttributes(), PasskeyCredentials.class);
 			for (String key : res.getAttributes().keySet()) {
 				switch (key) {
-					case "comment":
-						if (Utility.unNull(dto.getComment()).length() > MAX_CHARS_COMMENT) {
-							throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Field too long (max=" + MAX_CHARS_COMMENT + "): " + key);
+					case "passkeyName":
+						if (Utility.unNull(dto.getPasskeyName()).length() > MAX_CHARS_PASSKEY_NAME) {
+							throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Field too long (max=" + MAX_CHARS_PASSKEY_NAME + "): " + key);
 						}
-						ApiUtil.setNonEmptyStr(key, dto.getComment(), pc::setComment);
+						ApiUtil.setNonEmptyStr(key, dto.getPasskeyName(), pc::setPasskeyName);
 						break;
 					default:
 						throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Unexpected field: " + key);

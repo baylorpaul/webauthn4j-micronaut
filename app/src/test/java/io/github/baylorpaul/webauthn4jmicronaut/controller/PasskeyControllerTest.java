@@ -73,7 +73,7 @@ public class PasskeyControllerTest {
 		// Make sure no values are provided that we don't expect. That would be a major security issue.
 
 		// We expect precisely these attributes, and no more.
-		List<String> expectedAttrs = List.of("lastUsedDate", "comment", "created", "updated");
+		List<String> expectedAttrs = List.of("lastUsedDate", "passkeyName", "created", "updated");
 		Set<String> attrs = res.getAttributes().keySet();
 		Assertions.assertEquals(expectedAttrs.size(), attrs.size());
 		for (String expectedKey : expectedAttrs) {
@@ -118,10 +118,10 @@ public class PasskeyControllerTest {
 
 	private PasskeyCredentials updatePasskey(PasskeyCredentials pc1) {
 		// Ensure the attributes match expected alternate values from what we're changing them to
-		Assertions.assertNull(pc1.getComment());
+		Assertions.assertNull(pc1.getPasskeyName());
 
 		LinkedHashMap<String, Object> attrs = new LinkedHashMap<>();
-		attrs.put("comment", "My iPhone 15 Pro Max");
+		attrs.put("passkeyName", "My iPhone 15 Pro Max");
 
 		JsonApiObject<?> body = JsonApiObject.builder()
 				.data(JsonApiResource.builder()
@@ -147,7 +147,7 @@ public class PasskeyControllerTest {
 		Assertions.assertNotNull(pc.getUser());
 		Assertions.assertEquals(testCreds.userId(), pc.getUser().getId());
 		Assertions.assertNull(pc.getLastUsedDate());
-		Assertions.assertEquals("My iPhone 15 Pro Max", pc.getComment());
+		Assertions.assertEquals("My iPhone 15 Pro Max", pc.getPasskeyName());
 
 		return pc;
 	}

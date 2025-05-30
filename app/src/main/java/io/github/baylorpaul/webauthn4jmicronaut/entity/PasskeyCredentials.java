@@ -68,10 +68,10 @@ public class PasskeyCredentials implements JsonApiResourceable {
 	/** Timestamp for last usage of the credential in an authentication process */
 	private @Nullable Instant lastUsedDate;
 	/**
-	 * An optional free-form comment to further note the usage of the passkey. E.g. a label to help users distinguish
-	 * between devices, such as "MacBook Pro" or "Work Phone"
+	 * An optional free-form name or comment to further describe the usage of the passkey. E.g. a label to help users
+	 * distinguish between devices, such as "MacBook Pro" or "Work Phone"
 	 */
-	private @Nullable String comment;
+	private @Nullable String passkeyName;
 	private @GeneratedValue Instant created;
 	private @GeneratedValue Instant updated;
 }
