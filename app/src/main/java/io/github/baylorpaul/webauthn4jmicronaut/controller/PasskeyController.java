@@ -22,10 +22,8 @@ import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCreden
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialRequestOptionsSessionDto;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.submission.UserVerificationDto;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyCredentials;
-import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyUserHandle;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.PasskeyCredentialsRepository;
-import io.github.baylorpaul.webauthn4jmicronaut.repo.PasskeyUserHandleRepository;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.UserRepository;
 import io.github.baylorpaul.webauthn4jmicronaut.rest.PasskeyRestService;
 import io.github.baylorpaul.webauthn4jmicronaut.security.AuthenticationProviderForPreVerifiedCredentials;
@@ -310,7 +308,10 @@ public class PasskeyController {
 	}
 
 	/**
-	 * POST the WebAuthn passkey authentication response as an already authenticated user.
+	 * POST the WebAuthn passkey authentication response as an already authenticated user. The reason this method
+	 * requires authentication is NOT for security purposes. It is a courtesy so that the requestor can be notified
+	 * earlier in the confirmation token process if they have provided a passkey for a different user than the one for
+	 * which they intend to use the confirmation token.
 	 * @param principal the authenticated user. Because the objective of this method is to verify passkey
 	 *            authentication, the "principal" is not absolutely required in theory, but this method is intended to
 	 *            only be used for users that are already authenticated.
@@ -326,20 +327,82 @@ public class PasskeyController {
 			@NonNull @Body String authenticationResponseJSON,
 			HttpRequest<?> request
 	) {
-		long userId = SecurityUtil.requireUserId(principal);
-		User user = userRepo.findById(userId)
-				.orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "User not found"));
-		String userIdStr = String.valueOf(user.getId());
+		long expectedUserId = SecurityUtil.requireUserId(principal);
 
+		return generateConfirmationToken(challengeSessionId, authenticationResponseJSON, expectedUserId, request);
+	}
+
+	/**
+	 * A less-preferred method to POST the WebAuthn passkey authentication response without being an authenticated user.
+	 * This means that the courtesy check to ensure a passkey was provided for the appropriate user will not occur. If a
+	 * passkey for the wrong user is selected, the requestor will encounter the error later in the process when they try
+	 * to use the confirmation token.
+	 * One use case for this instead of using the "authenticated" method is if a pre-existing user tries to login with a
+	 * federated login for the first time. To associate the federated login with the user, additional verification is
+	 * required, such as via passkey or password. Since the user isn't already authenticated by other means, this is an
+	 * appropriate method to use to verify the passkey authentication in exchange for a confirmation token.
+	 * @return a short-lived "passkey access verified" JWT confirmation token. This may be used to take a protected
+	 *         action that requires confirming user access. E.g. associating a federated login with a pre-existing user,
+	 *         adding an integration token, changing a user's password, or adding another passkey to the user's account.
+	 */
+	@Secured(SecurityRule.IS_ANONYMOUS) // no security
+	@Post("/methods/verifyAuthenticationForConfirmationTokenResponse")
+	public String verifyAuthenticationForConfirmationTokenResponse(
+			@NonNull @Header("X-Challenge-Session-ID") UUID challengeSessionId,
+			@NonNull @Body String authenticationResponseJSON,
+			HttpRequest<?> request
+	) {
+		// We'll be skipping the user ID courtesy check
+		Long optionalExpectedUserId = null;
+
+		return generateConfirmationToken(challengeSessionId, authenticationResponseJSON, optionalExpectedUserId, request);
+	}
+
+	/**
+	 * Generate a passkey access verified confirmation token that allows for taking protected actions, such as
+	 * associating a federated login with a pre-existing user, adding an integration token, changing a user's password,
+	 * or adding another passkey to the user's account.
+	 * An expected user ID may also be provided as a courtesy check, but it is not required and is NOT for security
+	 * purposes. This courtesy check verifies that the requestor is using the correct passkey for the intended user, in
+	 * case the requestor has passkeys for multiple users. If the expected user ID does not match the passkey
+	 * authentication response, the request will be rejected. That is not because of a security concern but is a
+	 * courtesy to the requestor in case they chose a passkey for the wrong user. This short-circuit courtesy ensures
+	 * they will not continue through the process with the wrong confirmation token, only to get an error later on when
+	 * they try to use the confirmation token for the wrong user.
+	 * @param optionalExpectedUserId null for no user ID check, else the expected user ID to verify. This is for a
+	 *            courtesy short-circuit verification, not security purposes.
+	 */
+	private String generateConfirmationToken(
+			@NonNull UUID challengeSessionId, @NonNull String authenticationResponseJSON,
+			@Nullable Long optionalExpectedUserId, HttpRequest<?> request
+	) {
 		try {
 			AuthenticationUserInfo userInfo = verifyAuthentication(challengeSessionId, authenticationResponseJSON);
-
 			if (userInfo == null) {
 				throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "No matching credentials");
-			} else if (!userInfo.getUserId().equals(userIdStr)) {
-				// Ensure the credentials in the authentication response match the authenticated User
-				throw new HttpStatusException(HttpStatus.FORBIDDEN, "Credentials for wrong user");
 			}
+
+			final long userId;
+			try {
+				userId = Long.parseLong(userInfo.getUserId());
+			} catch (NumberFormatException e) {
+				throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Unexpected user ID");
+			}
+
+			if (optionalExpectedUserId != null) {
+				// Courtesy check that the user ID matches what we expect. This is NOT a security check, but notifies
+				// the requestor of the mismatch earlier in the process, instead of waiting until they try to use the
+				// confirmation token. If the requestor had first invoked
+				// generateAuthenticationOptionsAsAuthenticatedUser(), then a user ID mismatch is not expected, since
+				// "allowCredentials" would have been set, and their authenticator would only pick a valid passkey.
+				if (userId != optionalExpectedUserId.longValue()) {
+					// Ensure the credentials in the authentication response match the authenticated User
+					throw new HttpStatusException(HttpStatus.FORBIDDEN, "Credentials for wrong user");
+				}
+			}
+
+			User user = userRepo.findById(userId)
+					.orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
 			String passkeyAccessVerifiedToken = userService.generatePasskeyAccessVerifiedConfirmationToken(user);
 			return passkeyAccessVerifiedToken;
