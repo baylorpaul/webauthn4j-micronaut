@@ -121,12 +121,61 @@ public class PasskeyControllerTest {
 		PublicKeyCredentialCreationOptionsSessionDto res = genRegOpts(email);
 
 		PasskeyCredAndUserHandle credAndUserHandle = createPasskeyCredWithUserHandle(res);
-		COSEKey coseKey = credAndUserHandle.attestedCredentialDataIncludingPrivateKey().getCOSEKey();
+		AttestedCredentialData attestedCredentialData = credAndUserHandle.attestedCredentialDataIncludingPrivateKey();
+		COSEKey coseKey = attestedCredentialData.getCOSEKey();
 
 		PasskeyCredentials pc = registerPasskey(res, coseKey.getPublicKey());
 
 		PublicKeyCredentialRequestOptionsSessionDto dto = generateAuthOpts();
 
+		assertAuthenticationVerificationSucceeds(dto, credAndUserHandle);
+	}
+
+	@Test
+	public void testVerifyAuthWithSignatureFromDifferentKey() {
+		final String email = "brand-new-user13989@gmail.com";
+		PublicKeyCredentialCreationOptionsSessionDto res = genRegOpts(email);
+
+		PasskeyCredAndUserHandle credAndUserHandle = createPasskeyCredWithUserHandle(res);
+		AttestedCredentialData attestedCredentialData = credAndUserHandle.attestedCredentialDataIncludingPrivateKey();
+		COSEKey coseKey = attestedCredentialData.getCOSEKey();
+
+		PasskeyCredentials pc = registerPasskey(res, coseKey.getPublicKey());
+
+		PublicKeyCredentialRequestOptionsSessionDto dto = generateAuthOpts();
+
+		String userHandleBase64Url = credAndUserHandle.userHandleBase64Url();
+		String base64UrlCredentialId = Base64UrlUtil.encodeToString(attestedCredentialData.getCredentialId());
+
+		// Get the authentication response but use a different key to sign the challenge
+		COSEKey differentKey = PasskeyTestUtil.generateCOSEKey(true);
+
+		assertAuthenticationVerificationFails(
+				dto,
+				userHandleBase64Url,
+				base64UrlCredentialId,
+				differentKey,
+				HttpStatus.UNAUTHORIZED,
+				"Invalid credentials and/or signature",
+				"Expected the verification to fail because the signature was created with a different key"
+		);
+
+		// test that a valid path also fails because the session is invalidated by the above failure
+		assertAuthenticationVerificationFails(
+				dto,
+				userHandleBase64Url,
+				base64UrlCredentialId,
+				// This is the right key, but the session is invalidated by the previous failure
+				coseKey,
+				HttpStatus.NOT_FOUND,
+				"invalid or expired challenge session",
+				"Expected the verification to fail because the challenge session was invalidated by the previous failure"
+		);
+	}
+
+	private void assertAuthenticationVerificationSucceeds(
+			PublicKeyCredentialRequestOptionsSessionDto dto, PasskeyCredAndUserHandle credAndUserHandle
+	) {
 		Map<String, Object> authenticationResponse = generatePasskeyAuthenticationResponse(
 				dto.getPublicKeyCredentialRequestOptions(), credAndUserHandle, null
 		);
@@ -143,6 +192,31 @@ public class PasskeyControllerTest {
 		// The JWT username is the user ID
 		long userId = Long.parseLong(loginResponse.getUsername());
 		Assertions.assertTrue(userId > 0L);
+	}
+
+	private void assertAuthenticationVerificationFails(
+			PublicKeyCredentialRequestOptionsSessionDto dto, String userHandleBase64Url, String base64UrlCredentialId,
+			COSEKey differentKey, HttpStatus expectedHttpStatus, String expectedErrorMsg, String errorMsgOnSuccess
+	) {
+		Map<String, Object> authenticationResponse = generatePasskeyAuthenticationResponse(
+				userHandleBase64Url,
+				base64UrlCredentialId,
+				differentKey,
+				dto.getPublicKeyCredentialRequestOptions().getChallenge()
+		);
+
+		try {
+			verifyAuthentication(
+					dto.getChallengeSessionId(),
+					authenticationResponse,
+					"/passkeys/methods/verifyAuthenticationForAccessTokenResponse",
+					null,
+					LoginResponse.class
+			);
+			Assertions.fail(errorMsgOnSuccess);
+		} catch (HttpClientResponseException e) {
+			JsonApiTestUtil.assertJsonApiErrorResponse(e, expectedHttpStatus, expectedErrorMsg);
+		}
 	}
 
 	/**
@@ -347,11 +421,24 @@ public class PasskeyControllerTest {
 	) {
 		AttestedCredentialData attestedCredentialData = credAndUserHandle.attestedCredentialDataIncludingPrivateKey();
 		byte[] credentialId = attestedCredentialData.getCredentialId();
-		String base64UrlCredentialId = Base64UrlUtil.encodeToString(credentialId);
-		COSEKey coseKey = attestedCredentialData.getCOSEKey();
-
 		Challenge challenge = challengeOverride == null ? requestOptions.getChallenge() : challengeOverride;
 
+		return generatePasskeyAuthenticationResponse(
+				credAndUserHandle.userHandleBase64Url(),
+				Base64UrlUtil.encodeToString(credentialId),
+				attestedCredentialData.getCOSEKey(),
+				challenge
+		);
+	}
+
+	/**
+	 * Simulate a call to navigator.credentials.get() in the browser/authenticator.
+	 * @return a simulated object representing an "authenticationResponse"
+	 */
+	private Map<String, Object> generatePasskeyAuthenticationResponse(
+			@NotNull String userHandleBase64Url, @NotNull String base64UrlCredentialId, @NotNull COSEKey coseKey,
+			@Nullable Challenge challenge
+	) {
 		Map<String, Object> authenticationResponse = new LinkedHashMap<>();
 		authenticationResponse.put("id", base64UrlCredentialId);
 		authenticationResponse.put("rawId", base64UrlCredentialId);
@@ -362,7 +449,6 @@ public class PasskeyControllerTest {
 
 		final String signatureBase64Url;
 		try {
-// TODO test failure scenarios with different keys. In that case, during verification, expect failure: UNAUTHORIZED, "Invalid credentials and/or signature"
 			byte[] signature = PasskeyTestUtil.generateAuthDataSignature(coseKey, rawAuthenticatorData, clientDataHash);
 			signatureBase64Url = Base64UrlUtil.encodeToString(signature);
 		} catch (GeneralSecurityException e) {
@@ -373,7 +459,7 @@ public class PasskeyControllerTest {
 		response.put("authenticatorData", Base64UrlUtil.encodeToString(rawAuthenticatorData));
 		response.put("clientDataJSON", Base64UrlUtil.encodeToString(clientData));
 		response.put("signature", signatureBase64Url);
-		response.put("userHandle", credAndUserHandle.userHandleBase64Url());
+		response.put("userHandle", userHandleBase64Url);
 		authenticationResponse.put("response", response);
 
 		authenticationResponse.put("type", PublicKeyCredentialType.PUBLIC_KEY.getValue());
