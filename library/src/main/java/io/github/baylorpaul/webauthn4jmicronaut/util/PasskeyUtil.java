@@ -106,18 +106,6 @@ public class PasskeyUtil {
 	);
 
 	/**
-	 * @param previouslyIssuedChallenge the previously issued challenge to verify
-	 */
-	public static ServerProperty buildServerPropertiesForVerification(
-			Origin origin, String rpId, Challenge previouslyIssuedChallenge
-	) throws HttpStatusException {
-		// tokenBinding is deprecated as of Level 3 of the spec, but the field is reserved so that it won't be reused
-		// for a different purpose. See https://developer.mozilla.org/en-US/docs/Web/API/AuthenticatorResponse/clientDataJSON#tokenbinding
-		byte[] tokenBindingId = null;
-		return new ServerProperty(origin, rpId, previouslyIssuedChallenge, tokenBindingId);
-	}
-
-	/**
 	 * Generate a new and random passkey user handle.
 	 * This is the user handle of the user account entity. To ensure secure operation, authentication and authorization
 	 * decisions MUST be made on the basis of this id member, not the displayName nor name members.

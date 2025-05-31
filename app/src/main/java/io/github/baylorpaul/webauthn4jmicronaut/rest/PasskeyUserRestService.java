@@ -93,7 +93,7 @@ public class PasskeyUserRestService implements PasskeyService<JsonApiTopLevelRes
 	 * @param previouslyIssuedChallenge the previously issued challenge to verify
 	 */
 	private ServerProperty buildServerPropertiesForVerification(Challenge previouslyIssuedChallenge) throws HttpStatusException {
-		return PasskeyUtil.buildServerPropertiesForVerification(
+		return new ServerProperty(
 				findOrigin(),
 				passkeyProps.getRpId(),
 				previouslyIssuedChallenge
