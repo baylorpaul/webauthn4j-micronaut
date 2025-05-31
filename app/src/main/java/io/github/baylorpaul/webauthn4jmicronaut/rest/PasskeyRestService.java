@@ -4,7 +4,6 @@ import io.github.baylorpaul.micronautjsonapi.model.JsonApiResource;
 import io.github.baylorpaul.micronautjsonapi.util.JsonApiUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyCredentials;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.PasskeyCredentialsRepository;
-import io.github.baylorpaul.webauthn4jmicronaut.util.ApiUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.Utility;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpStatus;
