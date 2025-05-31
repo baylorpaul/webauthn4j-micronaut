@@ -2,7 +2,6 @@ package io.github.baylorpaul.webauthn4jmicronaut.controller;
 
 import com.webauthn4j.WebAuthnManager;
 import com.webauthn4j.converter.exception.DataConversionException;
-import com.webauthn4j.converter.util.ObjectConverter;
 import com.webauthn4j.credential.CredentialRecord;
 import com.webauthn4j.credential.CredentialRecordImpl;
 import com.webauthn4j.data.*;
@@ -35,6 +34,7 @@ import io.github.baylorpaul.webauthn4jmicronaut.security.model.AuthenticationUse
 import io.github.baylorpaul.webauthn4jmicronaut.security.model.PasskeyChallengeAndUserHandle;
 import io.github.baylorpaul.webauthn4jmicronaut.service.UserSecurityService;
 import io.github.baylorpaul.webauthn4jmicronaut.service.UserService;
+import io.github.baylorpaul.webauthn4jmicronaut.util.PasskeyUtil;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -238,7 +238,7 @@ public class PasskeyController {
 			@NonNull @Header("X-Challenge-Session-ID") UUID challengeSessionId,
 			@NonNull @Body String registrationResponseJSON
 	) {
-		WebAuthnManager webAuthnManager = createWebAuthnManager();
+		WebAuthnManager webAuthnManager = PasskeyUtil.createWebAuthnManager();
 
 		RegistrationData registrationData;
 		try {
@@ -439,7 +439,7 @@ public class PasskeyController {
 	private @Nullable AuthenticationUserInfo verifyAuthentication(
 			UUID challengeSessionId, String authenticationResponseJSON
 	) throws HttpStatusException {
-		WebAuthnManager webAuthnManager = createWebAuthnManager();
+		WebAuthnManager webAuthnManager = PasskeyUtil.createWebAuthnManager();
 
 		AuthenticationData authenticationData;
 		try {
@@ -509,16 +509,5 @@ public class PasskeyController {
 	private static class UserIdAuthenticationRequest implements AuthenticationRequest<String, String> {
 		private String identity;
 		private String secret;
-	}
-
-	/**
-	 * Create a WebAuthnManager. Since most sites don’t require strict attestation statement verification, WebAuthn4J
-	 * provides WebAuthnManager.createNonStrictWebAuthnManager factory method that returns an WebAuthnManager instance
-	 * configured AttestationStatementVerifier and CertPathTrustworthinessVerifier not to verify attestation statements.
-	 * @see <a href="https://webauthn4j.github.io/webauthn4j/en/#configuration">WebAuthn4J Configuration</a>
-	 */
-	private static WebAuthnManager createWebAuthnManager() {
-		ObjectConverter objectConverter = new ObjectConverter();
-		return WebAuthnManager.createNonStrictWebAuthnManager(objectConverter);
 	}
 }
