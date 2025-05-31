@@ -1,7 +1,7 @@
 package io.github.baylorpaul.webauthn4jmicronaut.controller;
 
 import com.webauthn4j.util.Base64Util;
-import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.serialization.ByteArrayBase64UrlSerializer;
+import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.serialization.ByteArrayBase64UrlSerde;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.serde.annotation.Serdeable;
@@ -34,7 +34,7 @@ public class SystemTest {
 	@Serdeable
 	@ReflectiveAccess
 	private static class ClassWithByteArrayIdAndSerializer {
-		@Serdeable.Serializable(using = ByteArrayBase64UrlSerializer.class)
+		@Serdeable.Serializable(using = ByteArrayBase64UrlSerde.class)
 		private byte[] id;
 	}
 
@@ -43,6 +43,9 @@ public class SystemTest {
 		byte[] id = "!@#$%^&*()[]{};':\",.<>/?`~-=_+abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".getBytes(StandardCharsets.UTF_8);
 
 		RegularClassWithByteArrayId regClass = new RegularClassWithByteArrayId(id);
+		// If in the future we'd rather the default serialization for byte[] be Base64Url encoding (or other), that is
+		// fine. The below is only testing the default. And below that, we test that explicitly using
+		// ByteArrayBase64UrlSerde causes the serialization to use Base64Url encoding.
 		Assertions.assertEquals(
 				"{\"id\":[33,64,35,36,37,94,38,42,40,41,91,93,123,125,59,39,58,34,44,46,60,62,47,63,96,126,45,61,95,43,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,48,49,50,51,52,53,54,55,56,57]}",
 				jsonMapper.writeValueAsString(regClass)

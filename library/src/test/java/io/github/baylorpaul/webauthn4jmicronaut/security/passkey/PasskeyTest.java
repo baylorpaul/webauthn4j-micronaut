@@ -4,6 +4,7 @@ import com.webauthn4j.converter.AttestedCredentialDataConverter;
 import com.webauthn4j.converter.util.JsonConverter;
 import com.webauthn4j.converter.util.ObjectConverter;
 import com.webauthn4j.data.AuthenticatorTransport;
+import com.webauthn4j.data.CoreAuthenticationData;
 import com.webauthn4j.data.attestation.authenticator.AttestedCredentialData;
 import com.webauthn4j.data.attestation.authenticator.COSEKey;
 import com.webauthn4j.data.attestation.authenticator.EC2COSEKey;
@@ -13,6 +14,7 @@ import com.webauthn4j.data.extension.authenticator.RegistrationExtensionAuthenti
 import com.webauthn4j.data.extension.client.AuthenticationExtensionsClientOutputs;
 import com.webauthn4j.data.extension.client.CredentialPropertiesOutput;
 import com.webauthn4j.data.extension.client.RegistrationExtensionClientOutput;
+import com.webauthn4j.verifier.internal.AssertionSignatureVerifier;
 import io.github.baylorpaul.webauthn4jmicronaut.util.PasskeyTestUtil;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.serde.annotation.SerdeImport;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -113,7 +116,7 @@ public class PasskeyTest {
 
 	@Test
 	public void testSerializeCOSEKey() {
-		AttestedCredentialData attestedCredentialData = PasskeyTestUtil.buildFakeAttestedCredentialData();
+		AttestedCredentialData attestedCredentialData = PasskeyTestUtil.generateAttestedCredentialData(false);
 		COSEKey origCoseKey = attestedCredentialData.getCOSEKey();
 		final EC2COSEKey origEc2CoseKey;
 		if (origCoseKey instanceof EC2COSEKey ec2CoseKey) {
@@ -149,5 +152,23 @@ public class PasskeyTest {
 		} else {
 			Assertions.fail("Unexpected key type: " + resultCoseKey.getClass().getSimpleName());
 		}
+	}
+
+	@Test
+	public void testAuthDataSignature() throws GeneralSecurityException {
+		COSEKey coseKey = PasskeyTestUtil.generateCOSEKey(true);
+		byte[] rawAuthenticatorData = "ab56def".getBytes();
+		byte[] clientDataHash = "xy12mn".getBytes();
+
+		byte[] signature = PasskeyTestUtil.generateAuthDataSignature(coseKey, rawAuthenticatorData, clientDataHash);
+
+		CoreAuthenticationData authData = new CoreAuthenticationData(
+				null,
+				null,
+				rawAuthenticatorData,
+				clientDataHash,
+				signature
+		);
+		new AssertionSignatureVerifier().verify(authData, coseKey);
 	}
 }

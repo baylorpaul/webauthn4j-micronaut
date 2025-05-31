@@ -6,11 +6,14 @@ import io.github.baylorpaul.micronautjsonapi.model.JsonApiTopLevelResource;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.submission.UserVerificationDto;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.UserRepository;
+import io.github.baylorpaul.webauthn4jmicronaut.rest.UserRestService;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyConfigurationProperties;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyService;
+import io.github.baylorpaul.webauthn4jmicronaut.security.passkey.model.PasskeyCredAndUserHandle;
 import io.github.baylorpaul.webauthn4jmicronaut.util.EmailUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.PasskeyTestUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.PasswordUtil;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
@@ -20,6 +23,7 @@ import io.micronaut.transaction.TransactionDefinition;
 import io.micronaut.transaction.annotation.Transactional;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.junit.jupiter.api.Assertions;
 
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -47,6 +51,14 @@ public class TestCredentialsUtil {
 	@Client("/")
 	private HttpClient client;
 
+	@Inject
+	private UserRestService userRestService;
+
+	@Transactional(propagation = TransactionDefinition.Propagation.REQUIRES_NEW)
+	public @NonNull User createUser(String email) {
+		return userRestService.createUser(email, null, null);
+	}
+
 	public TestCreds createTestCreds() {
 		String email = EmailUtil.formatEmailAddress(TEST_EMAIL);
 		userRepo.saveUserIfNotExists(email, TEST_NAME);
@@ -68,18 +80,39 @@ public class TestCredentialsUtil {
 	}
 
 	@Transactional(propagation = TransactionDefinition.Propagation.REQUIRES_NEW)
-	public void createPasskeyRecordByUserId(long userId) {
+	public @NonNull PasskeyCredAndUserHandle createPasskeyRecordByUserId(long userId) {
 		String userHandleBase64Url = passkeyService.findUserHandleBase64Url(String.valueOf(userId), true);
-		createPasskeyRecord(userHandleBase64Url);
+		return createPasskeyRecord(userHandleBase64Url);
 	}
 
-	private void createPasskeyRecord(String userHandleBase64Url) {
+	@Transactional(propagation = TransactionDefinition.Propagation.REQUIRES_NEW)
+	public @NonNull PasskeyCredAndUserHandle createPasskeyRecordByUserHandleBase64Url(String userHandleBase64Url) {
+		return createPasskeyRecord(userHandleBase64Url);
+	}
+
+	private @NonNull PasskeyCredAndUserHandle createPasskeyRecord(String userHandleBase64Url) {
 		String originUrl = passkeyProps.getOriginUrl();
-		CredentialRecord cred = PasskeyTestUtil.buildFakeCredentialRecord(
+		boolean includePrivateKey = true;
+		CredentialRecord credIncludingPrivateKey = PasskeyTestUtil.generateCredentialRecord(
 				originUrl,
-				new DefaultChallenge()
+				new DefaultChallenge(),
+				includePrivateKey
 		);
 
-		passkeyService.saveCredential(userHandleBase64Url, cred);
+		// Even though we need the private key in PasskeyCredAndUserHandle (for the frontend portion of the tests),
+		// make sure we're not saving the private key on the backend (or even sending it to the backend)
+		CredentialRecord credWithoutPrivateKey = PasskeyTestUtil.cloneCredentialRecordWithoutPrivateKey(
+				credIncludingPrivateKey
+		);
+
+		Assertions.assertNotNull(credIncludingPrivateKey.getAttestedCredentialData().getCOSEKey().getPrivateKey());
+		Assertions.assertNull(credWithoutPrivateKey.getAttestedCredentialData().getCOSEKey().getPrivateKey());
+
+		passkeyService.saveCredential(userHandleBase64Url, credWithoutPrivateKey);
+
+		return new PasskeyCredAndUserHandle(
+				credIncludingPrivateKey.getAttestedCredentialData(),
+				userHandleBase64Url
+		);
 	}
 }
