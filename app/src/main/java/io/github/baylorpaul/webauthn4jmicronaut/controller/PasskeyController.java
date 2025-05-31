@@ -35,6 +35,7 @@ import io.github.baylorpaul.webauthn4jmicronaut.security.model.AuthenticationUse
 import io.github.baylorpaul.webauthn4jmicronaut.security.model.PasskeyChallengeAndUserHandle;
 import io.github.baylorpaul.webauthn4jmicronaut.service.UserSecurityService;
 import io.github.baylorpaul.webauthn4jmicronaut.service.UserService;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.annotation.SingleResult;
@@ -55,10 +56,12 @@ import io.micronaut.security.authentication.AuthenticationResponse;
 import io.micronaut.security.handlers.LoginHandler;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.serde.annotation.SerdeImport;
+import io.micronaut.serde.annotation.Serdeable;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -187,18 +190,24 @@ public class PasskeyController {
 		return passkeyService.generateRegistrationOptionsAndSaveChallenge(uniqueNameOrEmail, displayName);
 	}
 
+	@Data
+	@Serdeable
+	@Introspected
+	public static class RegistrationOptionsForExistingAccountDto {
+		/** the short-lived token that was recently issued to the user */
+		private @NotBlank String token;
+	}
+
 	/**
 	 * GET WebAuthn passkey registration / attestation options for adding to an existing account. The user account is
 	 * determined via the token provided, which was recently emailed to the user.
-	 * @param token the short-lived token that was recently issued to the user
 	 */
 	@Secured(SecurityRule.IS_ANONYMOUS) // no security
-	@Get("/methods/generateRegistrationOptionsForExistingAccount")
+	@Post("/methods/generateRegistrationOptionsForExistingAccount")
 	public PublicKeyCredentialCreationOptionsSessionDto generateRegistrationOptionsForExistingAccount(
-			@NotBlank String token
+			@Body RegistrationOptionsForExistingAccountDto regOpts
 	) {
-// TODO maybe this shouldn't be a GET request since it has a token? Although the email links to the frontend's web page have to be GET requests with the token.
-		return passkeyService.generateRegistrationOptionsForExistingAccountAndSaveChallenge(token);
+		return passkeyService.generateRegistrationOptionsForExistingAccountAndSaveChallenge(regOpts.getToken());
 	}
 
 	/**
