@@ -1,0 +1,61 @@
+[
+  {
+    "name": "com.github.dockerjava.api.model.RuntimeInfo",
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name" : "org.flywaydb.core.internal.configuration.extensions.DeployScriptFilenameConfigurationExtension",
+    "queryAllPublicMethods" : true,
+    "methods": [
+      {
+        "name": "getScriptFilename",
+        "parameterTypes": []
+      },
+      {
+        "name": "setScriptFilename",
+        "parameterTypes": ["java.lang.String"]
+      }
+    ]
+  },
+  {
+    "name" : "org.flywaydb.core.internal.configuration.extensions.PrepareScriptFilenameConfigurationExtension",
+    "queryAllPublicMethods" : true,
+    "methods": [
+      {
+        "name": "getScriptFilename",
+        "parameterTypes": []
+      },
+      {
+        "name": "setScriptFilename",
+        "parameterTypes": ["java.lang.String"]
+      }
+    ]
+  },
+  {
+    "name" : "org.flywaydb.database.postgresql.PostgreSQLConfigurationExtension",
+    "queryAllPublicMethods" : true,
+    "methods": [
+      {
+        "name": "isTransactionalLock",
+        "parameterTypes": []
+      },
+      {
+        "name": "getTransactional",
+        "parameterTypes": []
+      },
+      {
+        "name": "setTransactionalLock",
+        "parameterTypes": ["boolean"]
+      },
+      {
+        "name": "setTransactional",
+        "parameterTypes": ["org.flywaydb.database.postgresql.TransactionalModel"]
+      }
+    ]
+  }
+]

@@ -18,3 +18,18 @@ if (!devTopSecretPropsFile.exists()) {
     tasks.processResources.dependsOn(generateDevTopSecretProps)
     tasks.inspectRuntimeClasspath.dependsOn(generateDevTopSecretProps)
 }
+
+dockerfileNative {
+    // See https://micronaut-projects.github.io/micronaut-gradle-plugin/latest/index.html#_architecture_considerations
+    graalArch.set("x64")
+}
+
+dockerBuild {
+    platform = "linux/amd64"
+}
+dockerBuildNative {
+    platform = "linux/amd64"
+}
+optimizedDockerBuildNative {
+    platform = "linux/amd64"
+}

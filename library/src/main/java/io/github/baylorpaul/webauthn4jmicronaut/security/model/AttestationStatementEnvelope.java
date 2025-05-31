@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.webauthn4j.data.attestation.statement.AttestationStatement;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import lombok.Getter;
 
 /**
@@ -11,6 +12,7 @@ import lombok.Getter;
  * @see <a href="https://webauthn4j.github.io/webauthn4j/en/#attestationstatement">attestationStatement</a>
  */
 @Getter
+@ReflectiveAccess
 public class AttestationStatementEnvelope {
 
 	@JsonProperty("attStmt")

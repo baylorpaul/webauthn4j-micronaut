@@ -9,6 +9,10 @@ A [WebAuthn](https://webauthn.io/)/Passkeys library for [Micronaut](https://micr
 ### Run the app locally
     ./gradlew run
 
+### Run the app tests natively
+
+	./gradlew :app:nativeTest
+
 ## Notes
 
 ### MAJOR SECURITY WARNING!

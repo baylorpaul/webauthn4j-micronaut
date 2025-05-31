@@ -1,5 +1,8 @@
 package io.github.baylorpaul.webauthn4jmicronaut.util;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import com.webauthn4j.WebAuthnManager;
 import com.webauthn4j.converter.AttestedCredentialDataConverter;
 import com.webauthn4j.converter.util.CborConverter;
@@ -57,7 +60,20 @@ public class PasskeyUtil {
 	public static final Duration AUTHENTICATION_TIMEOUT = Duration.ofMinutes(5);
 
 	public static ObjectConverter findObjectConverter() {
-		return new ObjectConverter();
+		ObjectMapper jsonMapper = new ObjectMapper();
+		ObjectMapper cborMapper = new ObjectMapper(new CBORFactory());
+
+		// Fix issue during native tests, such as:
+		// com.fasterxml.jackson.databind.exc.InvalidDefinitionException: No serializer found for class
+		// com.webauthn4j.data.attestation.statement.COSEAlgorithmIdentifier and no properties discovered to create
+		// BeanSerializer (to avoid exception, disable SerializationFeature.FAIL_ON_EMPTY_BEANS). This appears to be a
+		// native image, in which case you may need to configure reflection for the class that is to be serialized
+		//
+		// See https://www.baeldung.com/jackson-jsonmappingexception#1-using-object-mapper-configuration
+		jsonMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+		cborMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+
+		return new ObjectConverter(jsonMapper, cborMapper);
 	}
 
 	private static JsonConverter findJsonConverter() {

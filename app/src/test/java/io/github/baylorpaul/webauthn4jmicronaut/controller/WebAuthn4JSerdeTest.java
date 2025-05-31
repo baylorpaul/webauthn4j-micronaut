@@ -1,6 +1,8 @@
-package io.github.baylorpaul.webauthn4jmicronaut.security.passkey;
+package io.github.baylorpaul.webauthn4jmicronaut.controller;
 
 import com.webauthn4j.converter.AttestedCredentialDataConverter;
+import com.webauthn4j.converter.jackson.deserializer.cbor.COSEKeyEnvelope;
+import com.webauthn4j.converter.util.CborConverter;
 import com.webauthn4j.converter.util.JsonConverter;
 import com.webauthn4j.converter.util.ObjectConverter;
 import com.webauthn4j.data.AuthenticatorTransport;
@@ -18,20 +20,25 @@ import com.webauthn4j.verifier.internal.AssertionSignatureVerifier;
 import io.github.baylorpaul.webauthn4jmicronaut.util.PasskeyTestUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.PasskeyUtil;
 import io.micronaut.json.JsonMapper;
-import io.micronaut.serde.annotation.SerdeImport;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.security.PublicKey;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
-@SerdeImport.Repeated({
-		@SerdeImport(AuthenticatorTransport.class)
-})
-public class PasskeyTest {
+/**
+ * Test serialization/deserialization of the WebAuthn4J library, including for native images and the @ReflectionConfig
+ * entries: ./gradlew :app:nativeTest
+ * Many of these tests could exist just in the library, but are here so that they may be tested against a native image,
+ * in case any @ReflectionConfig is missing.
+ */
+public class WebAuthn4JSerdeTest {
 
 	@Test
 	public void testSerializedClientExtensions() {
@@ -171,5 +178,47 @@ public class PasskeyTest {
 				signature
 		);
 		new AssertionSignatureVerifier().verify(authData, coseKey);
+	}
+
+	/**
+	 * Test serialization/deserialization of COSEKey
+	 */
+	@Test
+	public void testCoseKeySerialization() {
+		CborConverter cborConverter = PasskeyUtil.findObjectConverter().getCborConverter();
+		COSEKey coseKeyIn = PasskeyTestUtil.generateCOSEKey(true);
+		byte[] coseKeyBytes = cborConverter.writeValueAsBytes(coseKeyIn);
+
+		Map<String, Object> coseKeyValuesMap = cborConverter.readValue(new ByteArrayInputStream(coseKeyBytes), java.util.Map.class);
+
+		// Check that the values are mapped correctly, especially for native builds that require @ReflectiveAccess (or
+		// @ReflectionConfig if it's a library that can't be changed). Otherwise, values such as those configured via
+		// @JsonSubTypes, will not be mapped correctly. E.g. @JsonSubTypes in COSEKey.java or @JsonProperty in
+		// EC2COSEKey.java.
+		// See https://github.com/micronaut-projects/micronaut-core/issues/6672
+
+		// On a COSEKey, the @JsonTypeInfo specifies a "1" property, where EC2COSEKey is "2"
+		Assertions.assertEquals(2, coseKeyValuesMap.get("1"));
+		// On a EC2COSEKey, the "curve" is a @JsonProperty("-1"), where SECP256R1 has a value of 1
+		Assertions.assertEquals(1, coseKeyValuesMap.get("-1"));
+
+		COSEKeyEnvelope envOut = cborConverter.readValue(new ByteArrayInputStream(coseKeyBytes), COSEKeyEnvelope.class);
+		Assertions.assertNotNull(envOut);
+		COSEKey coseKeyOut = envOut.getCOSEKey();
+		Assertions.assertNotNull(coseKeyOut);
+		Assertions.assertEquals(coseKeyBytes.length, envOut.getLength());
+
+		PublicKey pkIn = coseKeyIn.getPublicKey();
+		PublicKey pkOut = coseKeyOut.getPublicKey();
+		Assertions.assertNotNull(pkIn);
+		Assertions.assertNotNull(pkOut);
+
+		Assertions.assertEquals(pkIn.getAlgorithm(), pkOut.getAlgorithm());
+		Assertions.assertEquals(pkIn.getFormat(), pkOut.getFormat());
+		Assertions.assertArrayEquals(pkIn.getEncoded(), pkOut.getEncoded());
+
+		Assertions.assertEquals(coseKeyIn.getKeyType(), coseKeyOut.getKeyType());
+		Assertions.assertArrayEquals(coseKeyIn.getKeyId(), coseKeyOut.getKeyId());
+		Assertions.assertEquals(coseKeyIn.getAlgorithm(), coseKeyOut.getAlgorithm());
 	}
 }
