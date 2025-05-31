@@ -11,6 +11,7 @@ import com.webauthn4j.data.client.challenge.Challenge;
 import com.webauthn4j.data.client.challenge.DefaultChallenge;
 import com.webauthn4j.data.extension.authenticator.AuthenticationExtensionAuthenticatorOutput;
 import com.webauthn4j.data.extension.client.AuthenticationExtensionsClientInputs;
+import com.webauthn4j.data.extension.client.AuthenticationExtensionsClientOutputs;
 import com.webauthn4j.verifier.exception.VerificationException;
 import io.github.baylorpaul.micronautjsonapi.identifiable.JsonApiResourceable;
 import io.github.baylorpaul.micronautjsonapi.model.JsonApiObject;
@@ -98,6 +99,7 @@ import java.util.UUID;
 		@SerdeImport(AuthenticatorAttachment.class),
 		@SerdeImport(AuthenticatorTransport.class),
 		@SerdeImport(AuthenticationExtensionsClientInputs.class),
+		@SerdeImport(AuthenticationExtensionsClientOutputs.class),
 		@SerdeImport(ResidentKeyRequirement.class),
 		@SerdeImport(UserVerificationRequirement.class),
 		@SerdeImport(AttestationConveyancePreference.class),

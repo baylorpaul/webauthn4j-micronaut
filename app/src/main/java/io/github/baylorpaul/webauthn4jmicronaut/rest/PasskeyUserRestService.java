@@ -1,7 +1,5 @@
 package io.github.baylorpaul.webauthn4jmicronaut.rest;
 
-import com.webauthn4j.converter.AttestedCredentialDataConverter;
-import com.webauthn4j.converter.util.ObjectConverter;
 import com.webauthn4j.credential.CredentialRecord;
 import com.webauthn4j.data.*;
 import com.webauthn4j.data.client.Origin;
@@ -98,15 +96,6 @@ public class PasskeyUserRestService implements PasskeyService<JsonApiTopLevelRes
 				passkeyProps.getRpId(),
 				previouslyIssuedChallenge
 		);
-	}
-
-	private static ObjectConverter findObjectConverter() {
-		return new ObjectConverter();
-	}
-
-	private static AttestedCredentialDataConverter findAttestedCredentialDataConverter() {
-		ObjectConverter objectConverter = findObjectConverter();
-		return new AttestedCredentialDataConverter(objectConverter);
 	}
 
 	/**

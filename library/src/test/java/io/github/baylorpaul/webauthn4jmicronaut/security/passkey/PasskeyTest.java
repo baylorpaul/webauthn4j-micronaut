@@ -16,6 +16,7 @@ import com.webauthn4j.data.extension.client.CredentialPropertiesOutput;
 import com.webauthn4j.data.extension.client.RegistrationExtensionClientOutput;
 import com.webauthn4j.verifier.internal.AssertionSignatureVerifier;
 import io.github.baylorpaul.webauthn4jmicronaut.util.PasskeyTestUtil;
+import io.github.baylorpaul.webauthn4jmicronaut.util.PasskeyUtil;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.serde.annotation.SerdeImport;
 import org.junit.jupiter.api.Assertions;
@@ -34,7 +35,7 @@ public class PasskeyTest {
 
 	@Test
 	public void testSerializedClientExtensions() {
-		ObjectConverter objectConverter = new ObjectConverter();
+		ObjectConverter objectConverter = PasskeyUtil.findObjectConverter();
 		JsonConverter jsonConverter = objectConverter.getJsonConverter();
 
 		AuthenticationExtensionsClientOutputs<RegistrationExtensionClientOutput> clientExtensions1 = new AuthenticationExtensionsClientOutputs.BuilderForRegistration()
@@ -67,7 +68,7 @@ public class PasskeyTest {
 
 	@Test
 	public void testSerializedAuthenticatorExtensions() {
-		ObjectConverter objectConverter = new ObjectConverter();
+		ObjectConverter objectConverter = PasskeyUtil.findObjectConverter();
 		JsonConverter jsonConverter = objectConverter.getJsonConverter();
 
 		AuthenticationExtensionsAuthenticatorOutputs<RegistrationExtensionAuthenticatorOutput> authenticatorExtensions1 = new AuthenticationExtensionsAuthenticatorOutputs.BuilderForRegistration()
@@ -125,7 +126,7 @@ public class PasskeyTest {
 			throw new IllegalArgumentException("Unsupported COSE key type: " + origCoseKey.getClass().getSimpleName());
 		}
 
-		ObjectConverter objectConverter = new ObjectConverter();
+		ObjectConverter objectConverter = PasskeyUtil.findObjectConverter();
 		AttestedCredentialDataConverter attestedCredentialDataConverter = new AttestedCredentialDataConverter(objectConverter);
 
 		// Convert to a byte array according to https://www.w3.org/TR/webauthn-1/#sec-attested-credential-data

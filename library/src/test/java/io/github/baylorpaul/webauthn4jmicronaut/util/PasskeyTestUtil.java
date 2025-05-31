@@ -246,7 +246,7 @@ public class PasskeyTestUtil {
 
 		AttestationObject attestationObject = new AttestationObject(authenticatorData, attestationStatement);
 
-		ObjectConverter objectConverter = new ObjectConverter();
+		ObjectConverter objectConverter = PasskeyUtil.findObjectConverter();
 		AttestationObjectConverter attestationObjectConverter = new AttestationObjectConverter(objectConverter);
 		return attestationObjectConverter.convertToBase64urlString(attestationObject);
 	}
@@ -262,7 +262,7 @@ public class PasskeyTestUtil {
 				null
 		);
 
-		ObjectConverter objectConverter = new ObjectConverter();
+		ObjectConverter objectConverter = PasskeyUtil.findObjectConverter();
 		CollectedClientDataConverter collectedClientDataConverter = new CollectedClientDataConverter(objectConverter);
 		return collectedClientDataConverter.convertToBase64UrlString(ccd);
 	}
@@ -278,7 +278,7 @@ public class PasskeyTestUtil {
 				null
 		);
 
-		ObjectConverter objectConverter = new ObjectConverter();
+		ObjectConverter objectConverter = PasskeyUtil.findObjectConverter();
 		CollectedClientDataConverter collectedClientDataConverter = new CollectedClientDataConverter(objectConverter);
 		return collectedClientDataConverter.convertToBytes(ccd);
 	}
@@ -320,7 +320,7 @@ public class PasskeyTestUtil {
 				rpIdHash, flags, 0L, attestedCredentialData
 		);
 
-		ObjectConverter objectConverter = new ObjectConverter();
+		ObjectConverter objectConverter = PasskeyUtil.findObjectConverter();
 		AuthenticatorDataConverter authenticatorDataConverter = new AuthenticatorDataConverter(objectConverter);
 		byte[] authDataByteArray = authenticatorDataConverter.convert(authenticatorData);
 		return Base64UrlUtil.encodeToString(authDataByteArray);
@@ -341,7 +341,7 @@ public class PasskeyTestUtil {
 						.build()
 		);
 
-		ObjectConverter objectConverter = new ObjectConverter();
+		ObjectConverter objectConverter = PasskeyUtil.findObjectConverter();
 		AuthenticatorDataConverter authenticatorDataConverter = new AuthenticatorDataConverter(objectConverter);
 		return authenticatorDataConverter.convert(authenticatorData);
 	}

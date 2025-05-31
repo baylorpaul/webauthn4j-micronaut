@@ -20,3 +20,7 @@ The password is always "topsecret".
 ### Email
 Email is not implemented in the sample app. The basic contents are logged instead.
 See MailTemplateService.java
+
+### Other Notes
+
+The app uses the [JSON:API](https://jsonapi.org/) specification via the [Micronaut JSON:API library](https://github.com/baylorpaul/micronaut-json-api).

@@ -56,7 +56,7 @@ public class PasskeyUtil {
 	 */
 	public static final Duration AUTHENTICATION_TIMEOUT = Duration.ofMinutes(5);
 
-	private static ObjectConverter findObjectConverter() {
+	public static ObjectConverter findObjectConverter() {
 		return new ObjectConverter();
 	}
 
