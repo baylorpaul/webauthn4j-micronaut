@@ -4,14 +4,13 @@ import com.webauthn4j.WebAuthnManager;
 import com.webauthn4j.converter.exception.DataConversionException;
 import com.webauthn4j.credential.CredentialRecord;
 import com.webauthn4j.credential.CredentialRecordImpl;
-import com.webauthn4j.data.*;
+import com.webauthn4j.data.AuthenticationData;
+import com.webauthn4j.data.AuthenticationParameters;
+import com.webauthn4j.data.RegistrationData;
+import com.webauthn4j.data.RegistrationParameters;
 import com.webauthn4j.data.attestation.authenticator.AuthenticatorData;
-import com.webauthn4j.data.attestation.statement.COSEAlgorithmIdentifier;
 import com.webauthn4j.data.client.challenge.Challenge;
-import com.webauthn4j.data.client.challenge.DefaultChallenge;
 import com.webauthn4j.data.extension.authenticator.AuthenticationExtensionAuthenticatorOutput;
-import com.webauthn4j.data.extension.client.AuthenticationExtensionsClientInputs;
-import com.webauthn4j.data.extension.client.AuthenticationExtensionsClientOutputs;
 import com.webauthn4j.verifier.exception.VerificationException;
 import io.github.baylorpaul.micronautjsonapi.identifiable.JsonApiResourceable;
 import io.github.baylorpaul.micronautjsonapi.model.JsonApiObject;
@@ -21,7 +20,6 @@ import io.github.baylorpaul.micronautjsonapi.model.JsonApiTopLevelResource;
 import io.github.baylorpaul.micronautjsonapi.util.JsonApiUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialCreationOptionsSessionDto;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialRequestOptionsSessionDto;
-import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.serialization.PasskeyEntityByteArrayIdMixin;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.submission.UserVerificationDto;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyCredentials;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
@@ -56,7 +54,6 @@ import io.micronaut.security.authentication.AuthenticationRequest;
 import io.micronaut.security.authentication.AuthenticationResponse;
 import io.micronaut.security.handlers.LoginHandler;
 import io.micronaut.security.rules.SecurityRule;
-import io.micronaut.serde.annotation.SerdeImport;
 import io.micronaut.serde.annotation.Serdeable;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
@@ -77,34 +74,6 @@ import java.util.UUID;
  * @see <a href="https://smartyr.me/blog/testing-passkeys-webauthn-with-spring/">Testing Passkeys / WebAuthn with Spring</a>
  * @see <a href="https://docs.spring.io/spring-security/reference/servlet/authentication/passkeys.html">Compare to Spring Security Passkeys, which uses X-CSRF-TOKEN</a>
  */
-@SerdeImport.Repeated({
-		@SerdeImport(PublicKeyCredentialCreationOptions.class),
-		@SerdeImport(PublicKeyCredentialRpEntity.class),
-		@SerdeImport(
-				value = PublicKeyCredentialUserEntity.class,
-				// Serialize the byte array ID to a Base64Url string, instead of a JSON number[]
-				mixin = PasskeyEntityByteArrayIdMixin.class
-		),
-		@SerdeImport(
-				value = PublicKeyCredentialDescriptor.class,
-				// Serialize the byte array ID to a Base64Url string, instead of a JSON number[]
-				mixin = PasskeyEntityByteArrayIdMixin.class
-		),
-		@SerdeImport(DefaultChallenge.class),
-		@SerdeImport(PublicKeyCredentialParameters.class),
-		@SerdeImport(PublicKeyCredentialType.class),
-		@SerdeImport(COSEAlgorithmIdentifier.class),
-		@SerdeImport(AuthenticatorSelectionCriteria.class),
-		@SerdeImport(PublicKeyCredentialHints.class),
-		@SerdeImport(AuthenticatorAttachment.class),
-		@SerdeImport(AuthenticatorTransport.class),
-		@SerdeImport(AuthenticationExtensionsClientInputs.class),
-		@SerdeImport(AuthenticationExtensionsClientOutputs.class),
-		@SerdeImport(ResidentKeyRequirement.class),
-		@SerdeImport(UserVerificationRequirement.class),
-		@SerdeImport(AttestationConveyancePreference.class),
-		@SerdeImport(PublicKeyCredentialRequestOptions.class)
-})
 @ExecuteOn(TaskExecutors.IO)
 @Controller("/passkeys")
 public class PasskeyController {

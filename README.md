@@ -11,7 +11,14 @@ dependencies {
 }
 ```
 
-#### Add API methods to your app, as demonstrated in the provided sample app's PasskeyController.java and UserController.java
+Then add API methods to your app, as demonstrated in the provided sample app's PasskeyController.java and UserController.java
+
+## Serialization Exceptions
+If you encounter a serialization exception for any WebAuthn4J classes such as the following, please submit an issue or pull request.
+While it is possible to resolve it in your own project, it would be best for the community to solve it in this library by adding the appropriate `@SerdeImport`s to `WebAuthn4jSerdeConfig.java`. Unit tests are also welcome!
+
+	IntrospectionException: No serializable introspection present for type XXX xxx. Consider adding Serdeable. Serializable annotate to type XXX xxx. Alternatively if you are not in control of the project's source code, you can use @SerdeImport(XXX.class) to enable serialization of this type.
+
 
 ## Developer Setup for the Sample Application
 ### Create a development database Simulated Environment:

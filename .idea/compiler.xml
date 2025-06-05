@@ -103,7 +103,7 @@
       <profile name="Gradle Imported" enabled="true">
         <outputRelativeToContentRoot value="true" />
         <option name="micronaut.processing.annotations" value="io.github.baylorpaul.webauthn4jmicronaut.*" />
-        <option name="micronaut.processing.group" value="io.github.baylorpaul.webauthn4jmicronaut" />
+        <option name="micronaut.processing.group" value="io.github.baylorpaul" />
         <option name="micronaut.processing.incremental" value="true" />
         <option name="micronaut.processing.module" value="library" />
         <processorPath useClasspath="false">
@@ -151,9 +151,9 @@
       <module name="webauthn4j-micronaut.app" options="-parameters -Amicronaut.processing.incremental=true -Amicronaut.processing.annotations=io.github.baylorpaul.webauthn4jmicronaut.* -Amicronaut.processing.group=io.github.baylorpaul.webauthn4jmicronaut -Amicronaut.processing.module=app" />
       <module name="webauthn4j-micronaut.app.main" options="-parameters -Amicronaut.processing.incremental=true -Amicronaut.processing.annotations=io.github.baylorpaul.webauthn4jmicronaut.* -Amicronaut.processing.group=io.github.baylorpaul.webauthn4jmicronaut -Amicronaut.processing.module=app" />
       <module name="webauthn4j-micronaut.app.test" options="-parameters -Amicronaut.processing.incremental=true -Amicronaut.processing.annotations=io.github.baylorpaul.webauthn4jmicronaut.* -Amicronaut.processing.group=io.github.baylorpaul.webauthn4jmicronaut -Amicronaut.processing.module=app" />
-      <module name="webauthn4j-micronaut.library" options="-parameters -Amicronaut.processing.incremental=true -Amicronaut.processing.annotations=io.github.baylorpaul.webauthn4jmicronaut.* -Amicronaut.processing.group=io.github.baylorpaul.webauthn4jmicronaut -Amicronaut.processing.module=library" />
-      <module name="webauthn4j-micronaut.library.main" options="-parameters -Amicronaut.processing.incremental=true -Amicronaut.processing.annotations=io.github.baylorpaul.webauthn4jmicronaut.* -Amicronaut.processing.group=io.github.baylorpaul.webauthn4jmicronaut -Amicronaut.processing.module=library" />
-      <module name="webauthn4j-micronaut.library.test" options="-parameters -Amicronaut.processing.incremental=true -Amicronaut.processing.annotations=io.github.baylorpaul.webauthn4jmicronaut.* -Amicronaut.processing.group=io.github.baylorpaul.webauthn4jmicronaut -Amicronaut.processing.module=library" />
+      <module name="webauthn4j-micronaut.library" options="-parameters -Amicronaut.processing.incremental=true -Amicronaut.processing.annotations=io.github.baylorpaul.webauthn4jmicronaut.* -Amicronaut.processing.group=io.github.baylorpaul -Amicronaut.processing.module=library" />
+      <module name="webauthn4j-micronaut.library.main" options="-parameters -Amicronaut.processing.incremental=true -Amicronaut.processing.annotations=io.github.baylorpaul.webauthn4jmicronaut.* -Amicronaut.processing.group=io.github.baylorpaul -Amicronaut.processing.module=library" />
+      <module name="webauthn4j-micronaut.library.test" options="-parameters -Amicronaut.processing.incremental=true -Amicronaut.processing.annotations=io.github.baylorpaul.webauthn4jmicronaut.* -Amicronaut.processing.group=io.github.baylorpaul -Amicronaut.processing.module=library" />
     </option>
   </component>
 </project>
