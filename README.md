@@ -2,15 +2,28 @@
 
 A [WebAuthn](https://webauthn.io/)/Passkeys library for [Micronaut](https://micronaut.io/) via [WebAuthn4J](https://github.com/webauthn4j/webauthn4j), with a sample app using [PostgreSQL](https://www.postgresql.org/) persistence.
 
-## Developer Setup
+## Library Setup
+
+#### Add Dependency to your `build.gradle`
+```groovy
+dependencies {
+    implementation("io.github.baylorpaul:webauthn4j-micronaut:1.0.1")
+}
+```
+
+#### Add API methods to your app, as demonstrated in the provided sample app's PasskeyController.java and UserController.java
+
+## Developer Setup for the Sample Application
 ### Create a development database Simulated Environment:
 	docker compose up -d
 
 ### Run the app locally
     ./gradlew run
 
-### Run the app tests natively
+### Run the app tests
+	./gradlew :app:test
 
+### Run the app tests natively
 	./gradlew :app:nativeTest
 
 ## Notes

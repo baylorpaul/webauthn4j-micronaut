@@ -6,8 +6,8 @@ plugins {
     id("maven-publish")
 }
 
-version = "1.0.0"
-group = "io.github.baylorpaul.webauthn4jmicronaut"
+version = "1.0.1"
+group = "io.github.baylorpaul"
 
 repositories {
     mavenCentral()
@@ -40,7 +40,7 @@ java {
 
 tasks.named('jar') {
     manifest {
-        attributes('Implementation-Title': project.name,
+        attributes('Implementation-Title': 'webauthn4j-micronaut',
                 'Implementation-Version': project.version)
     }
 }
@@ -80,7 +80,7 @@ publishing {
     publications {
         //maven(MavenPublication) {
         //    groupId = project.group
-        //    artifactId = project.name
+        //    artifactId = 'webauthn4j-micronaut'
         //    version = project.version
         //    from components.java
         //}
@@ -88,9 +88,10 @@ publishing {
             from(components.java)
 
             pom {
-                //name = "${project.group}:${project.name}"
+                //name = "${project.group}:webauthn4j-micronaut"
                 name = 'WebAuthn4J Micronaut library'
-                description = 'A WebAuthn/Passkeys library for Micronaut via WebAuthn4J, with a sample app using PostgreSQL persistence.'
+                artifactId = 'webauthn4j-micronaut'
+                description = 'A WebAuthn/Passkeys library for Micronaut via WebAuthn4J.'
                 url = 'https://github.com/baylorpaul/webauthn4j-micronaut'
                 inceptionYear = '2025'
                 licenses {
