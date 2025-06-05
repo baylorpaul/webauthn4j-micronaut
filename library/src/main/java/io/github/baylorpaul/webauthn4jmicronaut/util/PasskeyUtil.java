@@ -1,7 +1,6 @@
 package io.github.baylorpaul.webauthn4jmicronaut.util;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import com.webauthn4j.WebAuthnManager;
 import com.webauthn4j.converter.AttestedCredentialDataConverter;
@@ -70,8 +69,8 @@ public class PasskeyUtil {
 		// native image, in which case you may need to configure reflection for the class that is to be serialized
 		//
 		// See https://www.baeldung.com/jackson-jsonmappingexception#1-using-object-mapper-configuration
-		jsonMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
-		cborMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+		//jsonMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+		//cborMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
 
 		return new ObjectConverter(jsonMapper, cborMapper);
 	}
