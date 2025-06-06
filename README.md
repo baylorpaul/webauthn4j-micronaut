@@ -7,7 +7,7 @@ A [WebAuthn](https://webauthn.io/)/Passkeys library for [Micronaut](https://micr
 #### Add Dependency to your `build.gradle`
 ```groovy
 dependencies {
-    implementation("io.github.baylorpaul:webauthn4j-micronaut:1.1.0")
+    implementation("io.github.baylorpaul:webauthn4j-micronaut:1.1.1")
 }
 ```
 
