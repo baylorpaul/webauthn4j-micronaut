@@ -55,5 +55,5 @@ Login to https://central.sonatype.com/
 
 If you haven't already, "[Register/Add a Namespace](https://blog.samzhu.dev/2024/04/20/Publishing-Your-Package-to-Maven-Central-in-2024/#Register-a-Namespace)".
 
-Now, "Publish Component". For the "Deployment Name", use e.g. `io.github.baylorpaul:webauthn4j-micronaut:1.0.1`
+Now, "Publish Component". For the "Deployment Name", use e.g. `io.github.baylorpaul:webauthn4j-micronaut:1.1.0`
 Upload the zip file in `library/build/publications/maven-central`
