@@ -4,3 +4,4 @@ rootProject.name="webauthn4j-micronaut"
 
 include("library")
 include("app")
+include("web")
