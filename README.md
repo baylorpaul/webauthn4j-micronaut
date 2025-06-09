@@ -2,6 +2,10 @@
 
 A [WebAuthn](https://webauthn.io/)/Passkeys library for [Micronaut](https://micronaut.io/) via [WebAuthn4J](https://github.com/webauthn4j/webauthn4j), with a sample app using [PostgreSQL](https://www.postgresql.org/) persistence.
 
+![Main Screen](./docs/media/01-main-screen.png)
+
+![Authenticate](./docs/media/04-authenticate.png)
+
 ## Library Setup
 
 #### Add Dependency to your `build.gradle`
@@ -32,6 +36,10 @@ While it is possible to resolve it in your own project, it would be best for the
 
 ### Run the app tests natively
 	./gradlew :app:nativeTest
+
+## Start the sample web app
+
+See the [Sample Web App README](web/README.md).
 
 ## Notes
 
