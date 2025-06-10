@@ -27,6 +27,7 @@ import io.github.baylorpaul.webauthn4jmicronaut.service.mail.MockEmailService;
 import io.github.baylorpaul.webauthn4jmicronaut.service.mail.template.PasskeyAdditionLinkEmailTemplate;
 import io.github.baylorpaul.webauthn4jmicronaut.util.JsonApiTestUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.PasskeyTestUtil;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.*;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
@@ -606,13 +607,29 @@ public class PasskeyControllerTest {
 	}
 
 	/**
+	 * Add a passkey to an existing account that is already authenticated, using password credentials to re-verify
+	 * access. The user may re-verify via one of multiple authentication methods, but this test only uses the password
+	 * option.
+	 */
+	@Test
+	public void testRegisterNewPasskeyAsAuthenticatedUserUsingAPasswordToConfirmAccess() {
+		UserVerificationDto userVerificationDto = UserVerificationDto.builder()
+				.platform("web")
+				.jwtPasskeyAccessVerifiedToken(null)
+				.password(TestCredentialsUtil.TEST_PASSWORD)
+				.build();
+
+		registerPasskeyWithConfirmedUserAccess(userVerificationDto);
+	}
+
+	/**
 	 * Add a passkey to an existing account that is already authenticated, using pre-existing passkey credentials to
 	 * re-verify access. The user may re-verify via one of multiple authentication methods, but this test only uses the
 	 * passkey option. When the user re-authenticates with a passkey, the server will generate a short-lived token. That
 	 * token is used to confirm access when creating a new passkey. This uses ConfirmationType.PASSKEY_ACCESS_VERIFIED.
 	 */
 	@Test
-	public void testRegisterNewPasskeyAsAuthenticatedUser() {
+	public void testRegisterNewPasskeyAsAuthenticatedUserUsingAPreExistingPasskeyToConfirmAccess() {
 		// First, make sure we have a passkey, with which we'll re-verify access to the user's account
 		PasskeyCredAndUserHandle credAndUserHandle = testCredentialsUtil.createPasskeyRecordByUserId(testCreds.userId());
 
@@ -620,6 +637,10 @@ public class PasskeyControllerTest {
 		// Those registration options will subsequently be used to add another passkey to the user's account.
 		UserVerificationDto userVerificationDto = reVerifyUserAccessViaPasskey(credAndUserHandle);
 
+		registerPasskeyWithConfirmedUserAccess(userVerificationDto);
+	}
+
+	private void registerPasskeyWithConfirmedUserAccess(@NonNull UserVerificationDto userVerificationDto) {
 		// Generate passkey registration options that will be used to add a new passkey to the user's account.
 		PublicKeyCredentialCreationOptionsSessionDto res = genRegOptsAsAuthenticatedUser(userVerificationDto);
 
