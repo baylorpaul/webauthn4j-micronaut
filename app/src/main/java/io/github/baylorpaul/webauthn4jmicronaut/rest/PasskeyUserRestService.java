@@ -242,8 +242,9 @@ public class PasskeyUserRestService implements PasskeyService<JsonApiTopLevelRes
 		PasskeyUserHandle passkeyUserHandle = passkeyUserHandleRepo.findById(userHandleBase64Url)
 				.orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "passkey user handle not found"));
 
+		final boolean isNewUser = passkeyUserHandle.getUser() == null;
 		// If this is for a new user
-		if (passkeyUserHandle.getUser() == null) {
+		if (isNewUser) {
 			// Create the user, if possible.
 			// Throw an exception if "formattedEmail" already exists for a user. We purposely didn't check when generating
 			// the PasskeyUserHandle, and it's possible a user with that email could have been created in the meantime.
@@ -258,21 +259,21 @@ public class PasskeyUserRestService implements PasskeyService<JsonApiTopLevelRes
 			passkeyUserHandle = passkeyUserHandleRepo.update(passkeyUserHandle);
 		}
 
-		User user = passkeyUserHandle.getUser();
+		User userRef = passkeyUserHandle.getUser();
 
 		PasskeyCredentialsPersistable persistableCreds = PasskeyUtil.convertToPasskeyCredentialsPersistable(cred);
 
-		PasskeyCredentials pc = translateToPasskeyCredentials(persistableCreds, user);
+		PasskeyCredentials pc = translateToPasskeyCredentials(persistableCreds, userRef);
 		pc = passkeyCredentialsRepo.save(pc);
 
 		return pc.toTopLevelResource();
 	}
 
 	private static PasskeyCredentials translateToPasskeyCredentials(
-			PasskeyCredentialsPersistable persistableCreds, User user
+			PasskeyCredentialsPersistable persistableCreds, User userRef
 	) {
 		return PasskeyCredentials.builder()
-				.user(user)
+				.user(userRef)
 				.credentialId(persistableCreds.getBase64UrlCredentialId())
 				.attestedCredentialData(persistableCreds.getAttestedCredentialDataBytes())
 				.attestationStatementEnvelope(persistableCreds.getAttestationStatementEnvelope())
