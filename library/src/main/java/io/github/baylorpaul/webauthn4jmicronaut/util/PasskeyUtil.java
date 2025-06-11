@@ -145,7 +145,11 @@ public class PasskeyUtil {
 			@NonNull Duration timeout
 	) {
 		AuthenticatorSelectionCriteria authenticatorSelection = new AuthenticatorSelectionCriteria(
-				AuthenticatorAttachment.PLATFORM,
+				// Allow AuthenticatorAttachment.PLATFORM or AuthenticatorAttachment.CROSS_PLATFORM
+				// See https://www.w3.org/TR/webauthn-2/#enum-attachment
+				// See https://developers.yubico.com/WebAuthn/WebAuthn_Developer_Guide/Platform_vs_Cross-Platform.html
+				// See https://www.corbado.com/glossary/authenticatorselection#what-are-the-implications-of-the-authenticatorattachment-setting-in-authenticatorselection
+				null,
 				ResidentKeyRequirement.PREFERRED,
 				UserVerificationRequirement.PREFERRED
 		);
