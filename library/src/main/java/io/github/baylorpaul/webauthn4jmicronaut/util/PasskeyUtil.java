@@ -105,7 +105,7 @@ public class PasskeyUtil {
 	 * @see <a href="https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredentialCreationOptions#alg">PublicKeyCredentialCreationOptions.alg</a>
 	 * @see <a href="https://www.corbado.com/blog/webauthn-pubkeycredparams-credentialpublickey#6-recommendation">Select the right encryption algorithms</a>
 	 */
-	private static final List<PublicKeyCredentialParameters> PUB_KEY_CRED_PARAMS = List.of(
+	public static final List<PublicKeyCredentialParameters> PUB_KEY_CRED_PARAMS = List.of(
 			new PublicKeyCredentialParameters(
 					PublicKeyCredentialType.PUBLIC_KEY,
 					COSEAlgorithmIdentifier.EdDSA
