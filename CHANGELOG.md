@@ -1,5 +1,17 @@
 # Versions
 
+## 1.1.3
+
+_June 19, 2025_
+
+### Library
+
+- Introduced PasskeyConfiguration interface for common property sharing.
+
+### Tests
+
+- Moved test methods for generating registration and authentication responses to PasskeyTestUtil.
+
 ## 1.1.2
 
 _June 16, 2025_
