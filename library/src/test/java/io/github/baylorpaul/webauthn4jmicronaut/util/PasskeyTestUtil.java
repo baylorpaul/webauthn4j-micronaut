@@ -6,8 +6,7 @@ import com.webauthn4j.converter.CollectedClientDataConverter;
 import com.webauthn4j.converter.util.ObjectConverter;
 import com.webauthn4j.credential.CredentialRecord;
 import com.webauthn4j.credential.CredentialRecordImpl;
-import com.webauthn4j.data.AuthenticatorTransport;
-import com.webauthn4j.data.SignatureAlgorithm;
+import com.webauthn4j.data.*;
 import com.webauthn4j.data.attestation.AttestationObject;
 import com.webauthn4j.data.attestation.authenticator.*;
 import com.webauthn4j.data.attestation.statement.AttestationStatement;
@@ -24,8 +23,12 @@ import com.webauthn4j.data.extension.client.AuthenticationExtensionsClientOutput
 import com.webauthn4j.data.extension.client.RegistrationExtensionClientOutput;
 import com.webauthn4j.util.Base64UrlUtil;
 import com.webauthn4j.util.MessageDigestUtil;
+import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyConfiguration;
+import io.github.baylorpaul.webauthn4jmicronaut.security.passkey.model.PasskeyCredAndUserHandle;
 import io.micronaut.core.annotation.NonNull;
+import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -33,6 +36,9 @@ import java.security.*;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class PasskeyTestUtil {
@@ -231,7 +237,7 @@ public class PasskeyTestUtil {
 			@NonNull @NotBlank String rpId, byte[] credentialId
 	) {
 		byte[] rpIdHash = findRpIdHash(rpId);
-		AttestedCredentialData attestedCredentialData = PasskeyTestUtil.generateAttestedCredentialData(credentialId, false);
+		AttestedCredentialData attestedCredentialData = generateAttestedCredentialData(credentialId, false);
 		// 93 = bits 1011101 - See https://www.w3.org/TR/webauthn-2/#sctn-authenticator-data
 		byte flags = 93;
 		AuthenticatorData<RegistrationExtensionAuthenticatorOutput> authenticatorData = new AuthenticatorData<>(
@@ -313,7 +319,7 @@ public class PasskeyTestUtil {
 			@NonNull @NotBlank String rpId, byte[] credentialId
 	) {
 		byte[] rpIdHash = findRpIdHash(rpId);
-		AttestedCredentialData attestedCredentialData = PasskeyTestUtil.generateAttestedCredentialData(credentialId, false);
+		AttestedCredentialData attestedCredentialData = generateAttestedCredentialData(credentialId, false);
 		// 93 = bits 1011101 - See https://www.w3.org/TR/webauthn-2/#sctn-authenticator-data
 		byte flags = 93;
 		AuthenticatorData<AuthenticationExtensionAuthenticatorOutput> authenticatorData = new AuthenticatorData<>(
@@ -344,5 +350,127 @@ public class PasskeyTestUtil {
 		ObjectConverter objectConverter = PasskeyUtil.findObjectConverter();
 		AuthenticatorDataConverter authenticatorDataConverter = new AuthenticatorDataConverter(objectConverter);
 		return authenticatorDataConverter.convert(authenticatorData);
+	}
+
+	/**
+	 * Simulate a call to navigator.credentials.create() in the browser/authenticator.
+	 * @param challengeOverride null to use the challenge from the creation options, else a challenge to use as an
+	 *            override to test different scenarios
+	 * @return a simulated object representing a "registrationResponse"
+	 */
+	public static Map<String, Object> generatePasskeyRegistrationResponse(
+			@NotNull PasskeyConfiguration passkeyConfiguration,
+			@NotNull PublicKeyCredentialCreationOptions creationOptions, @Nullable Challenge challengeOverride
+	) {
+		COSEKey coseKey = generateCOSEKey(false);
+		PublicKey publicKey = coseKey.getPublicKey();
+		return generatePasskeyRegistrationResponse(passkeyConfiguration, creationOptions, challengeOverride, publicKey);
+	}
+
+	/**
+	 * Simulate a call to navigator.credentials.create() in the browser/authenticator.
+	 * @param challengeOverride null to use the challenge from the creation options, else a challenge to use as an
+	 *            override to test different scenarios
+	 * @return a simulated object representing a "registrationResponse"
+	 */
+	public static Map<String, Object> generatePasskeyRegistrationResponse(
+			@NotNull PasskeyConfiguration passkeyConfiguration,
+			@NotNull PublicKeyCredentialCreationOptions creationOptions, @Nullable Challenge challengeOverride,
+			@NotNull PublicKey publicKey
+	) {
+		byte[] credentialId = generateCredentialId();
+		String base64UrlId = Base64UrlUtil.encodeToString(credentialId);
+		Challenge challenge = challengeOverride == null ? creationOptions.getChallenge() : challengeOverride;
+
+		Map<String, Object> registrationResponse = new LinkedHashMap<>();
+		registrationResponse.put("id", base64UrlId);
+		registrationResponse.put("rawId", base64UrlId);
+
+		String publicKeyBase64Url = publicKey == null ? null : Base64UrlUtil.encodeToString(publicKey.getEncoded());
+
+		// Note: For "registration", the challenge does not need to be signed by the private key when using "none"
+		// attestation method. That's why we don't need to use the private key here. And that's why the server is not
+		// expecting a signature that includes the challenge during registration. It's a different story for
+		// "authentication", where the "signature" is required.
+		// See https://github.com/w3c/webauthn/issues/1355
+
+		Map<String, Object> response = new LinkedHashMap<>();
+		response.put("attestationObject", createAttestationObjectBase64UrlEncoded(passkeyConfiguration.getRpId(), credentialId));
+		response.put("clientDataJSON", createClientDataForPasskeyCreateBase64UrlEncoded(passkeyConfiguration.getOriginUrl(), challenge));
+		response.put("transports", List.of(AuthenticatorTransport.HYBRID.getValue(), AuthenticatorTransport.INTERNAL.getValue()));
+		response.put("publicKeyAlgorithm", COSEAlgorithmIdentifier.ES256.getValue());
+		// Hardcoded public key
+		response.put("publicKey", publicKeyBase64Url);
+		response.put("authenticatorData", createAuthenticatorDataForPasskeyCreateBase64UrlEncoded(passkeyConfiguration.getRpId(), credentialId));
+		registrationResponse.put("response", response);
+
+		registrationResponse.put("type", PublicKeyCredentialType.PUBLIC_KEY.getValue());
+		registrationResponse.put("clientExtensionResults", Map.of());
+		registrationResponse.put("authenticatorAttachment", AuthenticatorAttachment.PLATFORM.getValue());
+
+		return registrationResponse;
+	}
+
+	/**
+	 * Simulate a call to navigator.credentials.get() in the browser/authenticator.
+	 * @param challengeOverride null to use the challenge from the creation options, else a challenge to use as an
+	 *            override to test different scenarios
+	 * @return a simulated object representing an "authenticationResponse"
+	 */
+	public static Map<String, Object> generatePasskeyAuthenticationResponse(
+			@NotNull PasskeyConfiguration passkeyConfiguration,
+			@NotNull PublicKeyCredentialRequestOptions requestOptions,
+			@NotNull PasskeyCredAndUserHandle credAndUserHandle, @Nullable Challenge challengeOverride
+	) {
+		AttestedCredentialData attestedCredentialData = credAndUserHandle.attestedCredentialDataIncludingPrivateKey();
+		byte[] credentialId = attestedCredentialData.getCredentialId();
+		Challenge challenge = challengeOverride == null ? requestOptions.getChallenge() : challengeOverride;
+
+		return generatePasskeyAuthenticationResponse(
+				passkeyConfiguration,
+				credAndUserHandle.userHandleBase64Url(),
+				Base64UrlUtil.encodeToString(credentialId),
+				attestedCredentialData.getCOSEKey(),
+				challenge
+		);
+	}
+
+	/**
+	 * Simulate a call to navigator.credentials.get() in the browser/authenticator.
+	 * @return a simulated object representing an "authenticationResponse"
+	 */
+	public static Map<String, Object> generatePasskeyAuthenticationResponse(
+			@NotNull PasskeyConfiguration passkeyConfiguration,
+			@NotNull String userHandleBase64Url, @NotNull String base64UrlCredentialId, @NotNull COSEKey coseKey,
+			@Nullable Challenge challenge
+	) {
+		Map<String, Object> authenticationResponse = new LinkedHashMap<>();
+		authenticationResponse.put("id", base64UrlCredentialId);
+		authenticationResponse.put("rawId", base64UrlCredentialId);
+
+		byte[] rawAuthenticatorData = createAuthenticatorDataForPasskeyGet(passkeyConfiguration.getRpId());
+		byte[] clientData = createClientDataForPasskeyGet(passkeyConfiguration.getOriginUrl(), challenge);
+		byte[] clientDataHash = MessageDigestUtil.createSHA256().digest(clientData);
+
+		final String signatureBase64Url;
+		try {
+			byte[] signature = generateAuthDataSignature(coseKey, rawAuthenticatorData, clientDataHash);
+			signatureBase64Url = Base64UrlUtil.encodeToString(signature);
+		} catch (GeneralSecurityException e) {
+			throw new RuntimeException("Unable to generate a signature", e);
+		}
+
+		Map<String, Object> response = new LinkedHashMap<>();
+		response.put("authenticatorData", Base64UrlUtil.encodeToString(rawAuthenticatorData));
+		response.put("clientDataJSON", Base64UrlUtil.encodeToString(clientData));
+		response.put("signature", signatureBase64Url);
+		response.put("userHandle", userHandleBase64Url);
+		authenticationResponse.put("response", response);
+
+		authenticationResponse.put("type", PublicKeyCredentialType.PUBLIC_KEY.getValue());
+		authenticationResponse.put("clientExtensionResults", Map.of());
+		authenticationResponse.put("authenticatorAttachment", AuthenticatorAttachment.PLATFORM.getValue());
+
+		return authenticationResponse;
 	}
 }

@@ -9,7 +9,6 @@ import com.webauthn4j.data.attestation.statement.COSEAlgorithmIdentifier;
 import com.webauthn4j.data.client.challenge.Challenge;
 import com.webauthn4j.data.client.challenge.DefaultChallenge;
 import com.webauthn4j.util.Base64UrlUtil;
-import com.webauthn4j.util.MessageDigestUtil;
 import io.github.baylorpaul.micronautjsonapi.model.*;
 import io.github.baylorpaul.micronautjsonapi.util.JsonApiUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.ApplicationConfigurationProperties;
@@ -46,7 +45,6 @@ import org.junit.jupiter.api.TestInstance;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.security.GeneralSecurityException;
 import java.security.PublicKey;
 import java.util.*;
 import java.util.function.Consumer;
@@ -177,8 +175,8 @@ public class PasskeyControllerTest {
 	private void assertAuthenticationVerificationSucceeds(
 			PublicKeyCredentialRequestOptionsSessionDto dto, PasskeyCredAndUserHandle credAndUserHandle
 	) {
-		Map<String, Object> authenticationResponse = generatePasskeyAuthenticationResponse(
-				dto.getPublicKeyCredentialRequestOptions(), credAndUserHandle, null
+		Map<String, Object> authenticationResponse = PasskeyTestUtil.generatePasskeyAuthenticationResponse(
+				passkeyConfigurationProps, dto.getPublicKeyCredentialRequestOptions(), credAndUserHandle, null
 		);
 
 		// Now log in
@@ -199,7 +197,8 @@ public class PasskeyControllerTest {
 			PublicKeyCredentialRequestOptionsSessionDto dto, String userHandleBase64Url, String base64UrlCredentialId,
 			COSEKey differentKey, HttpStatus expectedHttpStatus, String expectedErrorMsg, String errorMsgOnSuccess
 	) {
-		Map<String, Object> authenticationResponse = generatePasskeyAuthenticationResponse(
+		Map<String, Object> authenticationResponse = PasskeyTestUtil.generatePasskeyAuthenticationResponse(
+				passkeyConfigurationProps,
 				userHandleBase64Url,
 				base64UrlCredentialId,
 				differentKey,
@@ -239,8 +238,8 @@ public class PasskeyControllerTest {
 
 		PublicKeyCredentialRequestOptionsSessionDto dto = generateAuthOpts();
 
-		Map<String, Object> authenticationResponse = generatePasskeyAuthenticationResponse(
-				dto.getPublicKeyCredentialRequestOptions(), credAndUserHandle, null
+		Map<String, Object> authenticationResponse = PasskeyTestUtil.generatePasskeyAuthenticationResponse(
+				passkeyConfigurationProps, dto.getPublicKeyCredentialRequestOptions(), credAndUserHandle, null
 		);
 
 		// Get a short-lived confirmation token that confirms user access to take a protected action, such as
@@ -274,8 +273,8 @@ public class PasskeyControllerTest {
 		// Don't use the provided challenge. Override it to something else
 		try {
 			Challenge challengeOverride = new DefaultChallenge();
-			Map<String, Object> registrationResponseWithWrongChallenge = generatePasskeyRegistrationResponse(
-					res.getPublicKeyCredentialCreationOptions(), challengeOverride
+			Map<String, Object> registrationResponseWithWrongChallenge = PasskeyTestUtil.generatePasskeyRegistrationResponse(
+					passkeyConfigurationProps, res.getPublicKeyCredentialCreationOptions(), challengeOverride
 			);
 			verifyRegistration(res.getChallengeSessionId(), registrationResponseWithWrongChallenge);
 			Assertions.fail("Expected the registration to fail because of the mismatched challenge");
@@ -288,8 +287,8 @@ public class PasskeyControllerTest {
 		// Now try with the correct challenge, but this request should fail because the previous request with the
 		// challenge session ID has caused the correct challenge to be discarded
 		try {
-			Map<String, Object> registrationResponse = generatePasskeyRegistrationResponse(
-					res.getPublicKeyCredentialCreationOptions(), null
+			Map<String, Object> registrationResponse = PasskeyTestUtil.generatePasskeyRegistrationResponse(
+					passkeyConfigurationProps, res.getPublicKeyCredentialCreationOptions(), null
 			);
 			verifyRegistration(res.getChallengeSessionId(), registrationResponse);
 			Assertions.fail("Expected the registration to fail because the challenge was previously discarded");
@@ -351,123 +350,6 @@ public class PasskeyControllerTest {
 						.anyMatch(p -> p.getAlg().getValue() == expectedAlg.getValue())
 				)
 		);
-	}
-
-	/**
-	 * Simulate a call to navigator.credentials.create() in the browser/authenticator.
-	 * @param challengeOverride null to use the challenge from the creation options, else a challenge to use as an
-	 *            override to test different scenarios
-	 * @return a simulated object representing a "registrationResponse"
-	 */
-	private Map<String, Object> generatePasskeyRegistrationResponse(
-			@NotNull PublicKeyCredentialCreationOptions creationOptions, @Nullable Challenge challengeOverride
-	) {
-		COSEKey coseKey = PasskeyTestUtil.generateCOSEKey(false);
-		PublicKey publicKey = coseKey.getPublicKey();
-		return generatePasskeyRegistrationResponse(creationOptions, challengeOverride, publicKey);
-	}
-
-	/**
-	 * Simulate a call to navigator.credentials.create() in the browser/authenticator.
-	 * @param challengeOverride null to use the challenge from the creation options, else a challenge to use as an
-	 *            override to test different scenarios
-	 * @return a simulated object representing a "registrationResponse"
-	 */
-	private Map<String, Object> generatePasskeyRegistrationResponse(
-			@NotNull PublicKeyCredentialCreationOptions creationOptions, @Nullable Challenge challengeOverride,
-			@NotNull PublicKey publicKey
-	) {
-		byte[] credentialId = PasskeyTestUtil.generateCredentialId();
-		String base64UrlId = Base64UrlUtil.encodeToString(credentialId);
-		Challenge challenge = challengeOverride == null ? creationOptions.getChallenge() : challengeOverride;
-
-		Map<String, Object> registrationResponse = new LinkedHashMap<>();
-		registrationResponse.put("id", base64UrlId);
-		registrationResponse.put("rawId", base64UrlId);
-
-		String publicKeyBase64Url = publicKey == null ? null : Base64UrlUtil.encodeToString(publicKey.getEncoded());
-
-		// Note: For "registration", the challenge does not need to be signed by the private key when using "none"
-		// attestation method. That's why we don't need to use the private key here. And that's why the server is not
-		// expecting a signature that includes the challenge during registration. It's a different story for
-		// "authentication", where the "signature" is required.
-		// See https://github.com/w3c/webauthn/issues/1355
-
-		Map<String, Object> response = new LinkedHashMap<>();
-		response.put("attestationObject", PasskeyTestUtil.createAttestationObjectBase64UrlEncoded(passkeyConfigurationProps.getRpId(), credentialId));
-		response.put("clientDataJSON", PasskeyTestUtil.createClientDataForPasskeyCreateBase64UrlEncoded(passkeyConfigurationProps.getOriginUrl(), challenge));
-		response.put("transports", List.of(AuthenticatorTransport.HYBRID.getValue(), AuthenticatorTransport.INTERNAL.getValue()));
-		response.put("publicKeyAlgorithm", COSEAlgorithmIdentifier.ES256.getValue());
-		// Hardcoded public key
-		response.put("publicKey", publicKeyBase64Url);
-		response.put("authenticatorData", PasskeyTestUtil.createAuthenticatorDataForPasskeyCreateBase64UrlEncoded(passkeyConfigurationProps.getRpId(), credentialId));
-		registrationResponse.put("response", response);
-
-		registrationResponse.put("type", PublicKeyCredentialType.PUBLIC_KEY.getValue());
-		registrationResponse.put("clientExtensionResults", Map.of());
-		registrationResponse.put("authenticatorAttachment", AuthenticatorAttachment.PLATFORM.getValue());
-
-		return registrationResponse;
-	}
-
-	/**
-	 * Simulate a call to navigator.credentials.get() in the browser/authenticator.
-	 * @param challengeOverride null to use the challenge from the creation options, else a challenge to use as an
-	 *            override to test different scenarios
-	 * @return a simulated object representing an "authenticationResponse"
-	 */
-	private Map<String, Object> generatePasskeyAuthenticationResponse(
-			@NotNull PublicKeyCredentialRequestOptions requestOptions,
-			@NotNull PasskeyCredAndUserHandle credAndUserHandle, @Nullable Challenge challengeOverride
-	) {
-		AttestedCredentialData attestedCredentialData = credAndUserHandle.attestedCredentialDataIncludingPrivateKey();
-		byte[] credentialId = attestedCredentialData.getCredentialId();
-		Challenge challenge = challengeOverride == null ? requestOptions.getChallenge() : challengeOverride;
-
-		return generatePasskeyAuthenticationResponse(
-				credAndUserHandle.userHandleBase64Url(),
-				Base64UrlUtil.encodeToString(credentialId),
-				attestedCredentialData.getCOSEKey(),
-				challenge
-		);
-	}
-
-	/**
-	 * Simulate a call to navigator.credentials.get() in the browser/authenticator.
-	 * @return a simulated object representing an "authenticationResponse"
-	 */
-	private Map<String, Object> generatePasskeyAuthenticationResponse(
-			@NotNull String userHandleBase64Url, @NotNull String base64UrlCredentialId, @NotNull COSEKey coseKey,
-			@Nullable Challenge challenge
-	) {
-		Map<String, Object> authenticationResponse = new LinkedHashMap<>();
-		authenticationResponse.put("id", base64UrlCredentialId);
-		authenticationResponse.put("rawId", base64UrlCredentialId);
-
-		byte[] rawAuthenticatorData = PasskeyTestUtil.createAuthenticatorDataForPasskeyGet(passkeyConfigurationProps.getRpId());
-		byte[] clientData = PasskeyTestUtil.createClientDataForPasskeyGet(passkeyConfigurationProps.getOriginUrl(), challenge);
-		byte[] clientDataHash = MessageDigestUtil.createSHA256().digest(clientData);
-
-		final String signatureBase64Url;
-		try {
-			byte[] signature = PasskeyTestUtil.generateAuthDataSignature(coseKey, rawAuthenticatorData, clientDataHash);
-			signatureBase64Url = Base64UrlUtil.encodeToString(signature);
-		} catch (GeneralSecurityException e) {
-			throw new RuntimeException("Unable to generate a signature", e);
-		}
-
-		Map<String, Object> response = new LinkedHashMap<>();
-		response.put("authenticatorData", Base64UrlUtil.encodeToString(rawAuthenticatorData));
-		response.put("clientDataJSON", Base64UrlUtil.encodeToString(clientData));
-		response.put("signature", signatureBase64Url);
-		response.put("userHandle", userHandleBase64Url);
-		authenticationResponse.put("response", response);
-
-		authenticationResponse.put("type", PublicKeyCredentialType.PUBLIC_KEY.getValue());
-		authenticationResponse.put("clientExtensionResults", Map.of());
-		authenticationResponse.put("authenticatorAttachment", AuthenticatorAttachment.PLATFORM.getValue());
-
-		return authenticationResponse;
 	}
 
 	private PasskeyCredentials verifyRegistration(UUID challengeSessionId, Map<String, Object> registrationResponse) {
@@ -542,8 +424,8 @@ public class PasskeyControllerTest {
 			);
 		}
 
-		Map<String, Object> registrationResponse = generatePasskeyRegistrationResponse(
-				res.getPublicKeyCredentialCreationOptions(), null
+		Map<String, Object> registrationResponse = PasskeyTestUtil.generatePasskeyRegistrationResponse(
+				passkeyConfigurationProps, res.getPublicKeyCredentialCreationOptions(), null
 		);
 		PasskeyCredentials pc = verifyRegistration(res.getChallengeSessionId(), registrationResponse);
 		Assertions.assertEquals(user.getId(), pc.getUser().getId());
@@ -708,8 +590,8 @@ public class PasskeyControllerTest {
 	private PasskeyCredentials registerPasskey(
 			PublicKeyCredentialCreationOptionsSessionDto res, PublicKey publicKey
 	) {
-		Map<String, Object> registrationResponse = generatePasskeyRegistrationResponse(
-				res.getPublicKeyCredentialCreationOptions(), null, publicKey
+		Map<String, Object> registrationResponse = PasskeyTestUtil.generatePasskeyRegistrationResponse(
+				passkeyConfigurationProps, res.getPublicKeyCredentialCreationOptions(), null, publicKey
 		);
 		PasskeyCredentials pc = verifyRegistration(res.getChallengeSessionId(), registrationResponse);
 		// Verify the user exists and has a passkey by checking if there is a user ID
@@ -756,8 +638,8 @@ public class PasskeyControllerTest {
 	) {
 		PublicKeyCredentialRequestOptionsSessionDto dto = generateAuthOptsAsAuthenticatedUser();
 
-		Map<String, Object> authenticationResponse = generatePasskeyAuthenticationResponse(
-				dto.getPublicKeyCredentialRequestOptions(), credAndUserHandle, null
+		Map<String, Object> authenticationResponse = PasskeyTestUtil.generatePasskeyAuthenticationResponse(
+				passkeyConfigurationProps, dto.getPublicKeyCredentialRequestOptions(), credAndUserHandle, null
 		);
 
 		return verifyAuthentication(
