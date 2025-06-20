@@ -1,6 +1,7 @@
 package io.github.baylorpaul.webauthn4jmicronaut.security.jwt;
 
 import com.webauthn4j.credential.CredentialRecord;
+import com.webauthn4j.data.attestation.authenticator.AttestedCredentialData;
 import com.webauthn4j.data.client.challenge.DefaultChallenge;
 import io.github.baylorpaul.micronautjsonapi.model.JsonApiTopLevelResource;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.submission.UserVerificationDto;
@@ -26,7 +27,6 @@ import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Assertions;
 
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @Singleton
 public class TestCredentialsUtil {
@@ -74,29 +74,23 @@ public class TestCredentialsUtil {
 		HttpRequest<?> request = HttpRequest.POST("/login", creds);
 		BearerAccessRefreshToken rsp = client.toBlocking().retrieve(request, BearerAccessRefreshToken.class);
 		String accessToken = rsp.getAccessToken();
-		assertNotNull(accessToken);
+		Assertions.assertNotNull(accessToken);
 
 		return accessToken;
 	}
 
 	@Transactional(propagation = TransactionDefinition.Propagation.REQUIRES_NEW)
-	public @NonNull PasskeyCredAndUserHandle createPasskeyRecordByUserId(long userId) {
+	public @NonNull PasskeyCredAndUserHandle createAndPersistPasskeyRecordByUserId(long userId) {
 		String userHandleBase64Url = passkeyService.findUserHandleBase64Url(String.valueOf(userId), true);
-		return createPasskeyRecord(userHandleBase64Url);
-	}
 
-	@Transactional(propagation = TransactionDefinition.Propagation.REQUIRES_NEW)
-	public @NonNull PasskeyCredAndUserHandle createPasskeyRecordByUserHandleBase64Url(String userHandleBase64Url) {
-		return createPasskeyRecord(userHandleBase64Url);
-	}
-
-	private @NonNull PasskeyCredAndUserHandle createPasskeyRecord(String userHandleBase64Url) {
-		String originUrl = passkeyProps.getOriginUrl();
 		boolean includePrivateKey = true;
+		AttestedCredentialData attestedCredentialDataIncludingPrivateKey = PasskeyTestUtil.generateAttestedCredentialData(includePrivateKey);
+
+		String originUrl = passkeyProps.getOriginUrl();
 		CredentialRecord credIncludingPrivateKey = PasskeyTestUtil.generateCredentialRecord(
 				originUrl,
 				new DefaultChallenge(),
-				includePrivateKey
+				attestedCredentialDataIncludingPrivateKey
 		);
 
 		// Even though we need the private key in PasskeyCredAndUserHandle (for the frontend portion of the tests),
@@ -110,9 +104,11 @@ public class TestCredentialsUtil {
 
 		passkeyService.saveCredential(userHandleBase64Url, credWithoutPrivateKey);
 
-		return new PasskeyCredAndUserHandle(
-				credIncludingPrivateKey.getAttestedCredentialData(),
-				userHandleBase64Url
-		);
+		return new PasskeyCredAndUserHandle(attestedCredentialDataIncludingPrivateKey, userHandleBase64Url);
+	}
+
+	public static @NonNull PasskeyCredAndUserHandle generatePasskeyCredAndUserHandle(String userHandleBase64Url) {
+		AttestedCredentialData attestedCredentialDataIncludingPrivateKey = PasskeyTestUtil.generateAttestedCredentialData(true);
+		return new PasskeyCredAndUserHandle(attestedCredentialDataIncludingPrivateKey, userHandleBase64Url);
 	}
 }

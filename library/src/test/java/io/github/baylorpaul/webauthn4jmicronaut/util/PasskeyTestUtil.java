@@ -44,20 +44,14 @@ import java.util.Set;
 public class PasskeyTestUtil {
 	private static final String SAMPLE_AAGUID = "fbfc3007-154e-4ecc-8c0b-6e020557d7bd";
 
-	/**
-	 * @param includePrivateKey true to include the private key. Note that the backend should never have the private
-	 *            key. Some frontend tests need the private key to sign data.
-	 */
 	public static CredentialRecord generateCredentialRecord(
-			@NonNull String originUrl, @NonNull Challenge savedChallenge, boolean includePrivateKey
+			@NonNull String originUrl, @NonNull Challenge savedChallenge, AttestedCredentialData attestedCredentialData
 	) {
 		AttestationStatement attestationStatement = new NoneAttestationStatement();
 		Boolean uvInitialized = true;
 		Boolean backupEligible = true;
 		Boolean backupState = true;
 		long counter = 0L;
-
-		AttestedCredentialData attestedCredentialData = generateAttestedCredentialData(includePrivateKey);
 
 		AuthenticationExtensionsAuthenticatorOutputs<RegistrationExtensionAuthenticatorOutput> authenticatorExtensions = new AuthenticationExtensionsAuthenticatorOutputs.BuilderForRegistration()
 				.build();
@@ -112,7 +106,7 @@ public class PasskeyTestUtil {
 		);
 	}
 
-	private static @NonNull AttestedCredentialData cloneAttestedCredentialDataWithoutPrivateKey(
+	public static @NonNull AttestedCredentialData cloneAttestedCredentialDataWithoutPrivateKey(
 			AttestedCredentialData orig
 	) {
 		COSEKey origCoseKey = orig.getCOSEKey();
@@ -213,7 +207,7 @@ public class PasskeyTestUtil {
 	 * @param includePrivateKey true to include the private key. Note that the backend should never have the private
 	 *            key. Some frontend tests need the private key to sign data.
 	 */
-	public static AttestedCredentialData generateAttestedCredentialData(boolean includePrivateKey) {
+	public static @NonNull AttestedCredentialData generateAttestedCredentialData(boolean includePrivateKey) {
 		byte[] attestedCredentialId = generateCredentialId();
 		return generateAttestedCredentialData(attestedCredentialId, includePrivateKey);
 	}
@@ -222,7 +216,7 @@ public class PasskeyTestUtil {
 	 * @param includePrivateKey true to include the private key. Note that the backend should never have the private
 	 *            key. Some frontend tests need the private key to sign data.
 	 */
-	public static AttestedCredentialData generateAttestedCredentialData(byte[] credentialId, boolean includePrivateKey) {
+	public static @NonNull AttestedCredentialData generateAttestedCredentialData(byte[] credentialId, boolean includePrivateKey) {
 		AAGUID aaguid = new AAGUID(SAMPLE_AAGUID);
 		COSEKey coseKey = generateCOSEKey(includePrivateKey);
 		return new AttestedCredentialData(aaguid, credentialId, coseKey);
@@ -234,10 +228,9 @@ public class PasskeyTestUtil {
 	}
 
 	public static String createAttestationObjectBase64UrlEncoded(
-			@NonNull @NotBlank String rpId, byte[] credentialId
+			@NonNull @NotBlank String rpId, @NonNull AttestedCredentialData attestedCredentialData
 	) {
 		byte[] rpIdHash = findRpIdHash(rpId);
-		AttestedCredentialData attestedCredentialData = generateAttestedCredentialData(credentialId, false);
 		// 93 = bits 1011101 - See https://www.w3.org/TR/webauthn-2/#sctn-authenticator-data
 		byte flags = 93;
 		AuthenticatorData<RegistrationExtensionAuthenticatorOutput> authenticatorData = new AuthenticatorData<>(
@@ -360,25 +353,10 @@ public class PasskeyTestUtil {
 	 */
 	public static Map<String, Object> generatePasskeyRegistrationResponse(
 			@NotNull PasskeyConfiguration passkeyConfiguration,
-			@NotNull PublicKeyCredentialCreationOptions creationOptions, @Nullable Challenge challengeOverride
-	) {
-		COSEKey coseKey = generateCOSEKey(false);
-		PublicKey publicKey = coseKey.getPublicKey();
-		return generatePasskeyRegistrationResponse(passkeyConfiguration, creationOptions, challengeOverride, publicKey);
-	}
-
-	/**
-	 * Simulate a call to navigator.credentials.create() in the browser/authenticator.
-	 * @param challengeOverride null to use the challenge from the creation options, else a challenge to use as an
-	 *            override to test different scenarios
-	 * @return a simulated object representing a "registrationResponse"
-	 */
-	public static Map<String, Object> generatePasskeyRegistrationResponse(
-			@NotNull PasskeyConfiguration passkeyConfiguration,
 			@NotNull PublicKeyCredentialCreationOptions creationOptions, @Nullable Challenge challengeOverride,
-			@NotNull PublicKey publicKey
+			@NotNull AttestedCredentialData attestedCredentialData
 	) {
-		byte[] credentialId = generateCredentialId();
+		byte[] credentialId = attestedCredentialData.getCredentialId();
 		String base64UrlId = Base64UrlUtil.encodeToString(credentialId);
 		Challenge challenge = challengeOverride == null ? creationOptions.getChallenge() : challengeOverride;
 
@@ -386,6 +364,8 @@ public class PasskeyTestUtil {
 		registrationResponse.put("id", base64UrlId);
 		registrationResponse.put("rawId", base64UrlId);
 
+		COSEKey coseKey = attestedCredentialData.getCOSEKey();
+		PublicKey publicKey = coseKey.getPublicKey();
 		String publicKeyBase64Url = publicKey == null ? null : Base64UrlUtil.encodeToString(publicKey.getEncoded());
 
 		// Note: For "registration", the challenge does not need to be signed by the private key when using "none"
@@ -395,7 +375,7 @@ public class PasskeyTestUtil {
 		// See https://github.com/w3c/webauthn/issues/1355
 
 		Map<String, Object> response = new LinkedHashMap<>();
-		response.put("attestationObject", createAttestationObjectBase64UrlEncoded(passkeyConfiguration.getRpId(), credentialId));
+		response.put("attestationObject", createAttestationObjectBase64UrlEncoded(passkeyConfiguration.getRpId(), attestedCredentialData));
 		response.put("clientDataJSON", createClientDataForPasskeyCreateBase64UrlEncoded(passkeyConfiguration.getOriginUrl(), challenge));
 		response.put("transports", List.of(AuthenticatorTransport.HYBRID.getValue(), AuthenticatorTransport.INTERNAL.getValue()));
 		response.put("publicKeyAlgorithm", COSEAlgorithmIdentifier.ES256.getValue());

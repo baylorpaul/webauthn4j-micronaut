@@ -45,7 +45,6 @@ import org.junit.jupiter.api.TestInstance;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.security.PublicKey;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -119,11 +118,10 @@ public class PasskeyControllerTest {
 		final String email = "brand-new-user23623@gmail.com";
 		PublicKeyCredentialCreationOptionsSessionDto res = genRegOpts(email);
 
-		PasskeyCredAndUserHandle credAndUserHandle = createPasskeyCredWithUserHandle(res);
+		PasskeyCredAndUserHandle credAndUserHandle = generatePasskeyCredWithUserHandle(res);
 		AttestedCredentialData attestedCredentialData = credAndUserHandle.attestedCredentialDataIncludingPrivateKey();
-		COSEKey coseKey = attestedCredentialData.getCOSEKey();
 
-		PasskeyCredentials pc = registerPasskey(res, coseKey.getPublicKey());
+		PasskeyCredentials pc = registerPasskey(res, attestedCredentialData);
 
 		PublicKeyCredentialRequestOptionsSessionDto dto = generateAuthOpts();
 
@@ -135,11 +133,11 @@ public class PasskeyControllerTest {
 		final String email = "brand-new-user13989@gmail.com";
 		PublicKeyCredentialCreationOptionsSessionDto res = genRegOpts(email);
 
-		PasskeyCredAndUserHandle credAndUserHandle = createPasskeyCredWithUserHandle(res);
+		PasskeyCredAndUserHandle credAndUserHandle = generatePasskeyCredWithUserHandle(res);
 		AttestedCredentialData attestedCredentialData = credAndUserHandle.attestedCredentialDataIncludingPrivateKey();
 		COSEKey coseKey = attestedCredentialData.getCOSEKey();
 
-		PasskeyCredentials pc = registerPasskey(res, coseKey.getPublicKey());
+		PasskeyCredentials pc = registerPasskey(res, attestedCredentialData);
 
 		PublicKeyCredentialRequestOptionsSessionDto dto = generateAuthOpts();
 
@@ -193,15 +191,19 @@ public class PasskeyControllerTest {
 		Assertions.assertTrue(userId > 0L);
 	}
 
+	/**
+	 * @param coseKey the COSEKey to sign with, which may be a different key than the one used to register the passkey
+	 *                   since we're testing failures
+	 */
 	private void assertAuthenticationVerificationFails(
 			PublicKeyCredentialRequestOptionsSessionDto dto, String userHandleBase64Url, String base64UrlCredentialId,
-			COSEKey differentKey, HttpStatus expectedHttpStatus, String expectedErrorMsg, String errorMsgOnSuccess
+			COSEKey coseKey, HttpStatus expectedHttpStatus, String expectedErrorMsg, String errorMsgOnSuccess
 	) {
 		Map<String, Object> authenticationResponse = PasskeyTestUtil.generatePasskeyAuthenticationResponse(
 				passkeyConfigurationProps,
 				userHandleBase64Url,
 				base64UrlCredentialId,
-				differentKey,
+				coseKey,
 				dto.getPublicKeyCredentialRequestOptions().getChallenge()
 		);
 
@@ -231,10 +233,10 @@ public class PasskeyControllerTest {
 		final String email = "brand-new-user78972@gmail.com";
 		PublicKeyCredentialCreationOptionsSessionDto res = genRegOpts(email);
 
-		PasskeyCredAndUserHandle credAndUserHandle = createPasskeyCredWithUserHandle(res);
-		COSEKey coseKey = credAndUserHandle.attestedCredentialDataIncludingPrivateKey().getCOSEKey();
+		PasskeyCredAndUserHandle credAndUserHandle = generatePasskeyCredWithUserHandle(res);
+		AttestedCredentialData attestedCredentialData = credAndUserHandle.attestedCredentialDataIncludingPrivateKey();
 
-		PasskeyCredentials pc = registerPasskey(res, coseKey.getPublicKey());
+		PasskeyCredentials pc = registerPasskey(res, attestedCredentialData);
 
 		PublicKeyCredentialRequestOptionsSessionDto dto = generateAuthOpts();
 
@@ -256,13 +258,11 @@ public class PasskeyControllerTest {
 		//  linking a federated login first the first time to an existing user account
 	}
 
-	private PasskeyCredAndUserHandle createPasskeyCredWithUserHandle(PublicKeyCredentialCreationOptionsSessionDto res) {
+	private PasskeyCredAndUserHandle generatePasskeyCredWithUserHandle(PublicKeyCredentialCreationOptionsSessionDto res) {
 		String userHandleBase64Url = Base64UrlUtil.encodeToString(
 				res.getPublicKeyCredentialCreationOptions().getUser().getId()
 		);
-		return testCredentialsUtil.createPasskeyRecordByUserHandleBase64Url(
-				userHandleBase64Url
-		);
+		return TestCredentialsUtil.generatePasskeyCredAndUserHandle(userHandleBase64Url);
 	}
 
 	@Test
@@ -270,11 +270,13 @@ public class PasskeyControllerTest {
 		final String email = "brand-new-user28683@gmail.com";
 		PublicKeyCredentialCreationOptionsSessionDto res = genRegOpts(email);
 
+		AttestedCredentialData attestedCredentialData = PasskeyTestUtil.generateAttestedCredentialData(true);
+
 		// Don't use the provided challenge. Override it to something else
 		try {
 			Challenge challengeOverride = new DefaultChallenge();
 			Map<String, Object> registrationResponseWithWrongChallenge = PasskeyTestUtil.generatePasskeyRegistrationResponse(
-					passkeyConfigurationProps, res.getPublicKeyCredentialCreationOptions(), challengeOverride
+					passkeyConfigurationProps, res.getPublicKeyCredentialCreationOptions(), challengeOverride, attestedCredentialData
 			);
 			verifyRegistration(res.getChallengeSessionId(), registrationResponseWithWrongChallenge);
 			Assertions.fail("Expected the registration to fail because of the mismatched challenge");
@@ -288,7 +290,7 @@ public class PasskeyControllerTest {
 		// challenge session ID has caused the correct challenge to be discarded
 		try {
 			Map<String, Object> registrationResponse = PasskeyTestUtil.generatePasskeyRegistrationResponse(
-					passkeyConfigurationProps, res.getPublicKeyCredentialCreationOptions(), null
+					passkeyConfigurationProps, res.getPublicKeyCredentialCreationOptions(), null, attestedCredentialData
 			);
 			verifyRegistration(res.getChallengeSessionId(), registrationResponse);
 			Assertions.fail("Expected the registration to fail because the challenge was previously discarded");
@@ -424,8 +426,9 @@ public class PasskeyControllerTest {
 			);
 		}
 
+		AttestedCredentialData attestedCredentialData = PasskeyTestUtil.generateAttestedCredentialData(true);
 		Map<String, Object> registrationResponse = PasskeyTestUtil.generatePasskeyRegistrationResponse(
-				passkeyConfigurationProps, res.getPublicKeyCredentialCreationOptions(), null
+				passkeyConfigurationProps, res.getPublicKeyCredentialCreationOptions(), null, attestedCredentialData
 		);
 		PasskeyCredentials pc = verifyRegistration(res.getChallengeSessionId(), registrationResponse);
 		Assertions.assertEquals(user.getId(), pc.getUser().getId());
@@ -501,7 +504,8 @@ public class PasskeyControllerTest {
 				.password(TestCredentialsUtil.TEST_PASSWORD)
 				.build();
 
-		registerPasskeyWithConfirmedUserAccess(userVerificationDto);
+		AttestedCredentialData attestedCredentialData = PasskeyTestUtil.generateAttestedCredentialData(true);
+		registerPasskeyWithConfirmedUserAccess(userVerificationDto, attestedCredentialData);
 	}
 
 	/**
@@ -513,30 +517,43 @@ public class PasskeyControllerTest {
 	@Test
 	public void testRegisterNewPasskeyAsAuthenticatedUserUsingAPreExistingPasskeyToConfirmAccess() {
 		// First, make sure we have a passkey, with which we'll re-verify access to the user's account
-		PasskeyCredAndUserHandle credAndUserHandle = testCredentialsUtil.createPasskeyRecordByUserId(testCreds.userId());
+		PasskeyCredAndUserHandle credAndUserHandle = testCredentialsUtil.createAndPersistPasskeyRecordByUserId(testCreds.userId());
 
 		// Re-verify user access. We'll use that confirmation token to generate passkey registration options.
 		// Those registration options will subsequently be used to add another passkey to the user's account.
 		UserVerificationDto userVerificationDto = reVerifyUserAccessViaPasskey(credAndUserHandle);
 
-		registerPasskeyWithConfirmedUserAccess(userVerificationDto);
+		// Making a separate passkey, so make new AttestedCredentialData.
+		// Don't reuse credAndUserHandle.attestedCredentialDataIncludingPrivateKey().
+		// Even if we tried to reuse it, we'd get a conflict due to a reuse of a credential ID.
+		AttestedCredentialData newAttestedCredentialData = PasskeyTestUtil.generateAttestedCredentialData(true);
+		registerPasskeyWithConfirmedUserAccess(
+				userVerificationDto, newAttestedCredentialData
+		);
 	}
 
-	private void registerPasskeyWithConfirmedUserAccess(@NonNull UserVerificationDto userVerificationDto) {
+	private void registerPasskeyWithConfirmedUserAccess(
+			@NonNull UserVerificationDto userVerificationDto, @NonNull AttestedCredentialData attestedCredentialData
+	) {
 		// Generate passkey registration options that will be used to add a new passkey to the user's account.
 		PublicKeyCredentialCreationOptionsSessionDto res = genRegOptsAsAuthenticatedUser(userVerificationDto);
 
 		// Now verify the registration of a new passkey
-		registerAndAssertPasskeyCredsCreatedForTestUser(res);
+		registerAndAssertPasskeyCredsCreatedForTestUser(res, attestedCredentialData);
 	}
 
 	@Test
 	public void testConfirmationTokenReuseForGenPasskeyRegOpts() {
-		PasskeyCredAndUserHandle credAndUserHandle = testCredentialsUtil.createPasskeyRecordByUserId(testCreds.userId());
+		PasskeyCredAndUserHandle credAndUserHandle = testCredentialsUtil.createAndPersistPasskeyRecordByUserId(testCreds.userId());
 		UserVerificationDto userVerificationDto = reVerifyUserAccessViaPasskey(credAndUserHandle);
 
 		// The first attempt to use the confirmation token should succeed
 		PublicKeyCredentialCreationOptionsSessionDto res1 = genRegOptsAsAuthenticatedUser(userVerificationDto);
+
+		// Making a separate passkey, so make new AttestedCredentialData.
+		// Don't reuse credAndUserHandle.attestedCredentialDataIncludingPrivateKey().
+		// Even if we tried to reuse it, we'd get a conflict due to a reuse of a credential ID.
+		AttestedCredentialData newAttestedCredentialData = PasskeyTestUtil.generateAttestedCredentialData(true);
 
 		// The second attempt should fail due to token reuse
 		try {
@@ -549,11 +566,11 @@ public class PasskeyControllerTest {
 		}
 
 		// The original options are still valid
-		registerAndAssertPasskeyCredsCreatedForTestUser(res1);
+		registerAndAssertPasskeyCredsCreatedForTestUser(res1, newAttestedCredentialData);
 
 		// Now the challenge is discarded, so the original options are no longer valid
 		try {
-			registerAndAssertPasskeyCredsCreatedForTestUser(res1);
+			registerAndAssertPasskeyCredsCreatedForTestUser(res1, newAttestedCredentialData);
 			Assertions.fail("Expected to get a 'Not Found' response");
 		} catch (HttpClientResponseException e) {
 			JsonApiTestUtil.assertJsonApiErrorResponse(e, HttpStatus.NOT_FOUND,
@@ -588,10 +605,10 @@ public class PasskeyControllerTest {
 	 * Register a new passkey
 	 */
 	private PasskeyCredentials registerPasskey(
-			PublicKeyCredentialCreationOptionsSessionDto res, PublicKey publicKey
+			PublicKeyCredentialCreationOptionsSessionDto res, AttestedCredentialData attestedCredentialData
 	) {
 		Map<String, Object> registrationResponse = PasskeyTestUtil.generatePasskeyRegistrationResponse(
-				passkeyConfigurationProps, res.getPublicKeyCredentialCreationOptions(), null, publicKey
+				passkeyConfigurationProps, res.getPublicKeyCredentialCreationOptions(), null, attestedCredentialData
 		);
 		PasskeyCredentials pc = verifyRegistration(res.getChallengeSessionId(), registrationResponse);
 		// Verify the user exists and has a passkey by checking if there is a user ID
@@ -602,9 +619,10 @@ public class PasskeyControllerTest {
 	/**
 	 * Register a new passkey and verify it for the test user
 	 */
-	private void registerAndAssertPasskeyCredsCreatedForTestUser(PublicKeyCredentialCreationOptionsSessionDto res) {
-		COSEKey coseKey = PasskeyTestUtil.generateCOSEKey(false);
-		PasskeyCredentials pc = registerPasskey(res, coseKey.getPublicKey());
+	private void registerAndAssertPasskeyCredsCreatedForTestUser(
+			PublicKeyCredentialCreationOptionsSessionDto res, AttestedCredentialData attestedCredentialData
+	) {
+		PasskeyCredentials pc = registerPasskey(res, attestedCredentialData);
 		Assertions.assertEquals(testCreds.userId(), pc.getUser().getId());
 	}
 
@@ -676,7 +694,7 @@ public class PasskeyControllerTest {
 
 	@Test
 	public void testGetPasskeys() {
-		testCredentialsUtil.createPasskeyRecordByUserId(testCreds.userId());
+		testCredentialsUtil.createAndPersistPasskeyRecordByUserId(testCreds.userId());
 
 		JsonApiArray arr = getPasskeys();
 
@@ -716,7 +734,7 @@ public class PasskeyControllerTest {
 
 	@Test
 	public void testPasskeyCrudOps() {
-		testCredentialsUtil.createPasskeyRecordByUserId(testCreds.userId());
+		testCredentialsUtil.createAndPersistPasskeyRecordByUserId(testCreds.userId());
 
 		// We're not going to do the C (Create) in CRUD here since Passkeys aren't created by typical API calls.
 		JsonApiArray arr = getPasskeys();
