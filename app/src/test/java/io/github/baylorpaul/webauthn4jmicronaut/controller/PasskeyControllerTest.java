@@ -78,7 +78,7 @@ public class PasskeyControllerTest {
 
 	@BeforeEach
 	public void init() {
-		this.testCreds = testCredentialsUtil.createTestCreds();
+		this.testCreds = testCredentialsUtil.createTestCredsWithPassword();
 	}
 
 	private JsonApiArray getPasskeys() {
@@ -690,6 +690,25 @@ public class PasskeyControllerTest {
 		PublicKeyCredentialRequestOptionsSessionDto dto = rsp.body();
 		Assertions.assertNotNull(dto);
 		return dto;
+	}
+
+	@Test
+	public void testCreateUserWithPasskeyAndRetrieveUserRecord() {
+		final String email = "brand-new-user42578@gmail.com";
+		TestCredentialsUtil.TestCreds creds = testCredentialsUtil.createUserAndAccessTokenWithPasskeyCreds(email);
+
+		HttpResponse<JsonApiTopLevelResource> userRsp = client.toBlocking().exchange(
+				HttpRequest.GET("/users/me")
+						.accept(MediaType.APPLICATION_JSON)
+						.bearerAuth(creds.accessToken()),
+				JsonApiTopLevelResource.class
+		);
+		JsonApiTopLevelResource tlRes = userRsp.body();
+		User user = JsonApiUtil.readResourceWithId(jsonMapper, tlRes.getData(), User.class)
+				.orElseThrow(() -> new RuntimeException("Expected to find user"));
+
+		Assertions.assertEquals(creds.userId(), user.getId());
+		Assertions.assertEquals(email, user.getEmail());
 	}
 
 	@Test

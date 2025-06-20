@@ -37,7 +37,7 @@ public class UserControllerTest {
 
 	@BeforeEach
 	public void init() {
-		this.testCreds = testCredentialsUtil.createTestCreds();
+		this.testCreds = testCredentialsUtil.createTestCredsWithPassword();
 	}
 
 	@Test

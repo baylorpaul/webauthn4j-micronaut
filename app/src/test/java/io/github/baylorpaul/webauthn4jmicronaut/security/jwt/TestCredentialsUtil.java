@@ -3,21 +3,31 @@ package io.github.baylorpaul.webauthn4jmicronaut.security.jwt;
 import com.webauthn4j.credential.CredentialRecord;
 import com.webauthn4j.data.attestation.authenticator.AttestedCredentialData;
 import com.webauthn4j.data.client.challenge.DefaultChallenge;
+import com.webauthn4j.util.Base64UrlUtil;
 import io.github.baylorpaul.micronautjsonapi.model.JsonApiTopLevelResource;
+import io.github.baylorpaul.micronautjsonapi.util.JsonApiUtil;
+import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialCreationOptionsSessionDto;
+import io.github.baylorpaul.webauthn4jmicronaut.dto.api.security.PublicKeyCredentialRequestOptionsSessionDto;
 import io.github.baylorpaul.webauthn4jmicronaut.dto.api.submission.UserVerificationDto;
+import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyCredentials;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.UserRepository;
 import io.github.baylorpaul.webauthn4jmicronaut.rest.UserRestService;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyConfigurationProperties;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyService;
+import io.github.baylorpaul.webauthn4jmicronaut.security.model.LoginResponse;
 import io.github.baylorpaul.webauthn4jmicronaut.security.passkey.model.PasskeyCredAndUserHandle;
+import io.github.baylorpaul.webauthn4jmicronaut.service.JsonService;
 import io.github.baylorpaul.webauthn4jmicronaut.util.EmailUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.PasskeyTestUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.PasswordUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
+import io.micronaut.http.uri.UriBuilder;
+import io.micronaut.json.JsonMapper;
 import io.micronaut.security.authentication.UsernamePasswordCredentials;
 import io.micronaut.security.token.render.BearerAccessRefreshToken;
 import io.micronaut.transaction.TransactionDefinition;
@@ -25,6 +35,8 @@ import io.micronaut.transaction.annotation.Transactional;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Assertions;
+
+import java.util.Map;
 
 @Singleton
 public class TestCredentialsUtil {
@@ -35,6 +47,12 @@ public class TestCredentialsUtil {
 
 	/** Credentials for a test */
 	public record TestCreds(long userId, String accessToken) {}
+
+	@Inject
+	private JsonService jsonService;
+
+	@Inject
+	private JsonMapper jsonMapper;
 
 	@Inject
 	private UserRepository userRepo;
@@ -68,7 +86,7 @@ public class TestCredentialsUtil {
 		return userId;
 	}
 
-	public TestCreds createTestCreds() {
+	public TestCreds createTestCredsWithPassword() {
 		long userId = saveTestUserIfNotExists();
 		String accessToken = createAccessTokenWithPassword(TEST_EMAIL, TEST_PASSWORD);
 		return new TestCreds(userId, accessToken);
@@ -82,6 +100,72 @@ public class TestCredentialsUtil {
 		Assertions.assertNotNull(accessToken);
 
 		return accessToken;
+	}
+
+	/**
+	 * Create a user, add passkey credentials to that user, and then login with those passkey credentials to get an access token
+	 */
+	public TestCreds createUserAndAccessTokenWithPasskeyCreds(String email) {
+
+		// Generate Passkey registration options
+		HttpResponse<PublicKeyCredentialCreationOptionsSessionDto> regOptRsp = client.toBlocking().exchange(
+				HttpRequest.GET(
+						UriBuilder.of("/passkeys/methods/generateRegistrationOptions")
+								.queryParam("uniqueNameOrEmail", email)
+								//.queryParam("displayName", displayName)
+								.toString()
+				),
+				PublicKeyCredentialCreationOptionsSessionDto.class
+		);
+		PublicKeyCredentialCreationOptionsSessionDto regOptDto = regOptRsp.body();
+		byte[] userHandle = regOptDto.getPublicKeyCredentialCreationOptions().getUser().getId();
+		String userHandleBase64Url = Base64UrlUtil.encodeToString(userHandle);
+
+		// Generate a credential ID and key pair
+		PasskeyCredAndUserHandle credAndUserHandle = generatePasskeyCredAndUserHandle(userHandleBase64Url);
+
+		// Simulate a call to navigator.credentials.create() in the browser/authenticator
+		Map<String, Object> registrationResponse = PasskeyTestUtil.generatePasskeyRegistrationResponse(
+				passkeyProps, regOptDto.getPublicKeyCredentialCreationOptions(), null,
+				credAndUserHandle.attestedCredentialDataIncludingPrivateKey()
+		);
+
+		// Register a passkey
+		HttpResponse<JsonApiTopLevelResource> regRsp = client.toBlocking().exchange(
+				HttpRequest.POST("/passkeys/methods/verifyRegistration", jsonService.toJson(registrationResponse))
+						.header("X-Challenge-Session-ID", regOptDto.getChallengeSessionId().toString()),
+				JsonApiTopLevelResource.class
+		);
+		PasskeyCredentials pc = JsonApiUtil.readResourceWithId(jsonMapper, regRsp.body().getData(), PasskeyCredentials.class)
+				.orElseThrow(() -> new RuntimeException("Expected to find passkey credentials"));
+
+		// Generate Passkey authentication options
+		HttpResponse<PublicKeyCredentialRequestOptionsSessionDto> authOptRsp = client.toBlocking().exchange(
+				HttpRequest.GET("/passkeys/methods/generateAuthenticationOptions"),
+				PublicKeyCredentialRequestOptionsSessionDto.class
+		);
+		PublicKeyCredentialRequestOptionsSessionDto dto = authOptRsp.body();
+
+		// Simulate a call to navigator.credentials.get() in the browser/authenticator
+		Map<String, Object> authenticationResponse = PasskeyTestUtil.generatePasskeyAuthenticationResponse(
+				passkeyProps, dto.getPublicKeyCredentialRequestOptions(), credAndUserHandle, null
+		);
+
+		// Authenticate for an access token
+		HttpResponse<LoginResponse> authRsp = client.toBlocking().exchange(
+				HttpRequest.POST(
+								"/passkeys/methods/verifyAuthenticationForAccessTokenResponse",
+								jsonService.toJson(authenticationResponse)
+						)
+						.header("X-Challenge-Session-ID", dto.getChallengeSessionId().toString()),
+				LoginResponse.class
+		);
+		LoginResponse lr = authRsp.body();
+		Assertions.assertNotNull(lr);
+		final long userId = Long.parseLong(lr.getUsername());
+		final String accessToken = lr.getAccessToken();
+
+		return new TestCreds(userId, accessToken);
 	}
 
 	@Transactional(propagation = TransactionDefinition.Propagation.REQUIRES_NEW)
