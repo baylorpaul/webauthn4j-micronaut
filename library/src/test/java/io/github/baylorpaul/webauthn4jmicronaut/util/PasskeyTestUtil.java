@@ -309,14 +309,17 @@ public class PasskeyTestUtil {
 	}
 
 	public static String createAuthenticatorDataForPasskeyCreateBase64UrlEncoded(
-			@NonNull @NotBlank String rpId, byte[] credentialId
+			@NonNull @NotBlank String rpId, @NotNull AttestedCredentialData attestedCredentialData
 	) {
+		AttestedCredentialData attestedCredentialDataWithoutPrivateKey = PasskeyTestUtil.cloneAttestedCredentialDataWithoutPrivateKey(
+				attestedCredentialData
+		);
+
 		byte[] rpIdHash = findRpIdHash(rpId);
-		AttestedCredentialData attestedCredentialData = generateAttestedCredentialData(credentialId, false);
 		// 93 = bits 1011101 - See https://www.w3.org/TR/webauthn-2/#sctn-authenticator-data
 		byte flags = 93;
 		AuthenticatorData<AuthenticationExtensionAuthenticatorOutput> authenticatorData = new AuthenticatorData<>(
-				rpIdHash, flags, 0L, attestedCredentialData
+				rpIdHash, flags, 0L, attestedCredentialDataWithoutPrivateKey
 		);
 
 		ObjectConverter objectConverter = PasskeyUtil.findObjectConverter();
@@ -381,7 +384,7 @@ public class PasskeyTestUtil {
 		response.put("publicKeyAlgorithm", COSEAlgorithmIdentifier.ES256.getValue());
 		// Hardcoded public key
 		response.put("publicKey", publicKeyBase64Url);
-		response.put("authenticatorData", createAuthenticatorDataForPasskeyCreateBase64UrlEncoded(passkeyConfiguration.getRpId(), credentialId));
+		response.put("authenticatorData", createAuthenticatorDataForPasskeyCreateBase64UrlEncoded(passkeyConfiguration.getRpId(), attestedCredentialData));
 		registrationResponse.put("response", response);
 
 		registrationResponse.put("type", PublicKeyCredentialType.PUBLIC_KEY.getValue());
