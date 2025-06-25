@@ -15,7 +15,7 @@ repositories {
 
 dependencies {
     annotationProcessor("org.projectlombok:lombok")
-    api("com.webauthn4j:webauthn4j-core:0.29.2.RELEASE")
+    api("com.webauthn4j:webauthn4j-core:0.29.3.RELEASE")
     implementation("io.micronaut.serde:micronaut-serde-jackson")
     implementation("io.micronaut.validation:micronaut-validation")
     compileOnly("org.projectlombok:lombok")
