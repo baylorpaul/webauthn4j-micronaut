@@ -71,4 +71,12 @@ public class UserControllerTest {
 		Assertions.assertNotNull(res);
 		return res;
 	}
+
+	@Test
+	public void testCreateUserWithPasskeyAndGetAccessToken() {
+		TestCredentialsUtil.TestCreds testCreds = testCredentialsUtil.createUserAndAccessTokenWithPasskeyCredsViaServiceCalls(
+				"brand-new-user25070@gmail.com"
+		);
+		Assertions.assertNotNull(testCreds.accessToken());
+	}
 }

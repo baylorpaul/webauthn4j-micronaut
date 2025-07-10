@@ -13,27 +13,37 @@ import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyCredentials;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.UserRepository;
 import io.github.baylorpaul.webauthn4jmicronaut.rest.UserRestService;
+import io.github.baylorpaul.webauthn4jmicronaut.security.AuthenticationProviderForPreVerifiedCredentials;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyConfigurationProperties;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyService;
+import io.github.baylorpaul.webauthn4jmicronaut.security.model.AuthenticationUserInfo;
 import io.github.baylorpaul.webauthn4jmicronaut.security.model.LoginResponse;
 import io.github.baylorpaul.webauthn4jmicronaut.security.passkey.model.PasskeyCredAndUserHandle;
 import io.github.baylorpaul.webauthn4jmicronaut.service.JsonService;
+import io.github.baylorpaul.webauthn4jmicronaut.util.ApiUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.EmailUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.PasskeyTestUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.PasswordUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.security.authentication.Authentication;
+import io.micronaut.security.authentication.AuthenticationResponse;
 import io.micronaut.security.authentication.UsernamePasswordCredentials;
+import io.micronaut.security.handlers.LoginHandler;
 import io.micronaut.security.token.render.BearerAccessRefreshToken;
 import io.micronaut.transaction.TransactionDefinition;
 import io.micronaut.transaction.annotation.Transactional;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Assertions;
 
 import java.util.Map;
@@ -64,6 +74,9 @@ public class TestCredentialsUtil {
 	private PasskeyService<JsonApiTopLevelResource, UserVerificationDto> passkeyService;
 
 	@Inject
+	private LoginHandler<HttpRequest<?>, MutableHttpResponse<BearerAccessRefreshToken>> loginHandler;
+
+	@Inject
 	@Client("/")
 	private HttpClient client;
 
@@ -79,8 +92,15 @@ public class TestCredentialsUtil {
 	 * @return the user ID
 	 */
 	public long saveTestUserIfNotExists() {
-		String email = EmailUtil.formatEmailAddress(TEST_EMAIL);
-		userRepo.saveUserIfNotExists(email, TEST_NAME);
+		return saveUserIfNotExists(TEST_EMAIL, TEST_NAME);
+	}
+
+	/**
+	 * @return the user ID
+	 */
+	private long saveUserIfNotExists(@NonNull @NotBlank String email, @NonNull @NotBlank String name) {
+		email = EmailUtil.formatEmailAddress(email);
+		userRepo.saveUserIfNotExists(email, name);
 		long userId = userRepo.findByEmail(email).map(User::getId).orElse(-1L).longValue();
 		Assertions.assertTrue(userId > 0L);
 		return userId;
@@ -90,6 +110,11 @@ public class TestCredentialsUtil {
 		long userId = saveTestUserIfNotExists();
 		String accessToken = createAccessTokenWithPassword(TEST_EMAIL, TEST_PASSWORD);
 		return new TestCreds(userId, accessToken);
+	}
+
+	public User findUser(TestCreds testCreds) {
+		return userRepo.findById(testCreds.userId())
+				.orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "User not found"));
 	}
 
 	public String createAccessTokenWithPassword(String email, String password) {
@@ -103,9 +128,10 @@ public class TestCredentialsUtil {
 	}
 
 	/**
-	 * Create a user, add passkey credentials to that user, and then login with those passkey credentials to get an access token
+	 * With API calls (not direct service calls), create a user, add passkey credentials to that user, and then login
+	 * with those passkey credentials to get an access token
 	 */
-	public TestCreds createUserAndAccessTokenWithPasskeyCreds(String email) {
+	public TestCreds createUserAndAccessTokenWithPasskeyCredsViaApiCalls(String email) {
 
 		// Generate Passkey registration options
 		HttpResponse<PublicKeyCredentialCreationOptionsSessionDto> regOptRsp = client.toBlocking().exchange(
@@ -168,6 +194,38 @@ public class TestCredentialsUtil {
 		return new TestCreds(userId, accessToken);
 	}
 
+	/**
+	 * With service calls (not API calls), create a user, add passkey credentials to that user, and then login with
+	 * those passkey credentials to get an access token. This is faster than making the API calls, and is able to skip a
+	 * lot of the security requirements. That speed makes it more ideal for tests that aren't testing passkey creation,
+	 * but need a passkey to exist.
+	 */
+	@Transactional(propagation = TransactionDefinition.Propagation.REQUIRES_NEW)
+	public TestCreds createUserAndAccessTokenWithPasskeyCredsViaServiceCalls(String email) {
+		String formattedEmail = ApiUtil.formatAndValidateEmail(email);
+		String formattedDisplayName = ApiUtil.buildAndValidateUserName(null, formattedEmail);
+		long userId = saveUserIfNotExists(email, formattedDisplayName);
+
+		// Create and save a passkey
+		PasskeyCredAndUserHandle credAndUserHandle = createAndPersistPasskeyRecordByUserId(userId);
+
+		byte[] credentialId = credAndUserHandle.attestedCredentialDataIncludingPrivateKey().getCredentialId();
+		AuthenticationUserInfo authUserInfo = passkeyService.generateAuthenticationUserInfo(credentialId);
+
+		AuthenticationResponse authResp = AuthenticationProviderForPreVerifiedCredentials.generateAuthenticationResponse(
+				authUserInfo
+		);
+		Authentication authentication = authResp.getAuthentication()
+				.orElseThrow(() -> new RuntimeException("Unable to get authentication"));
+		MutableHttpResponse<BearerAccessRefreshToken> httpResp = loginHandler.loginSuccess(authentication, null);
+		BearerAccessRefreshToken loginResponse = httpResp.body();
+
+		return new TestCreds(userId, loginResponse.getAccessToken());
+	}
+
+	/**
+	 * With service calls (not API calls), create and persist a passkey record for a user
+	 */
 	@Transactional(propagation = TransactionDefinition.Propagation.REQUIRES_NEW)
 	public @NonNull PasskeyCredAndUserHandle createAndPersistPasskeyRecordByUserId(long userId) {
 		String userHandleBase64Url = passkeyService.findUserHandleBase64Url(String.valueOf(userId), true);

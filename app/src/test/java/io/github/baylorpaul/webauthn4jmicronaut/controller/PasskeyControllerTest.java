@@ -456,7 +456,7 @@ public class PasskeyControllerTest {
 	@Test
 	public void testCreateUserWithPasskeyAndRetrieveUserRecord() {
 		final String email = "brand-new-user42578@gmail.com";
-		TestCredentialsUtil.TestCreds creds = testCredentialsUtil.createUserAndAccessTokenWithPasskeyCreds(email);
+		TestCredentialsUtil.TestCreds creds = testCredentialsUtil.createUserAndAccessTokenWithPasskeyCredsViaApiCalls(email);
 
 		HttpResponse<JsonApiTopLevelResource> userRsp = client.toBlocking().exchange(
 				HttpRequest.GET("/users/me")

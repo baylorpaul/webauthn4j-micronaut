@@ -38,7 +38,7 @@ public class AuthenticationProviderForPreVerifiedCredentials {
 	/**
 	 * Generate an authentication response for a user after their credentials have already been validated
 	 */
-	private static @NonNull AuthenticationResponse generateAuthenticationResponse(@Nullable AuthenticationUserInfo userInfo) {
+	public static @NonNull AuthenticationResponse generateAuthenticationResponse(@Nullable AuthenticationUserInfo userInfo) {
 		AuthenticationFailureReason authenticationFailureReason = checkForFailureReason(userInfo);
 
 		if (authenticationFailureReason == null) {
