@@ -320,17 +320,34 @@ public class PasskeyControllerTest {
 	 */
 	@Test
 	public void testRegisterNewPasskeyAsAuthenticatedUserUsingAPasswordToConfirmAccess() {
-		if (AuthenticationUtil.PASSWORD_AUTHENTICATION_ENABLED) {
-			TestCredentialsUtil.TestCreds testCreds = testCredentialsUtil.createTestCredsWithPassword();
-			UserVerificationDto userVerificationDto = UserVerificationDto.builder()
-					.platform("web")
-					.jwtPasskeyAccessVerifiedToken(null)
-					.password(TestCredentialsUtil.TEST_PASSWORD)
-					.build();
-
-			AttestedCredentialData attestedCredentialData = PasskeyTestUtil.generateAttestedCredentialData(true);
-			registerPasskeyWithConfirmedUserAccess(testCreds, userVerificationDto, attestedCredentialData);
+		final TestCredentialsUtil.TestCreds testCreds;
+		try {
+			testCreds = testCredentialsUtil.createTestCredsWithPassword();
+			if (AuthenticationUtil.PASSWORD_AUTHENTICATION_ENABLED) {
+				registerNewPasskeyAsAuthenticatedUserUsingAPassword(testCreds);
+			} else {
+				Assertions.fail("Should not be able to create a user with a password while password authentication is disabled");
+			}
+		} catch (HttpClientResponseException e) {
+			if (AuthenticationUtil.PASSWORD_AUTHENTICATION_ENABLED) {
+				Assertions.fail("Unexpected failure while attempting to create a user with a password");
+			} else {
+				JsonApiTestUtil.assertJsonApiErrorResponse(e, HttpStatus.UNAUTHORIZED,
+						"Password Expired", "Password Expired"
+				);
+			}
 		}
+	}
+
+	private void registerNewPasskeyAsAuthenticatedUserUsingAPassword(TestCredentialsUtil.TestCreds testCreds) {
+		UserVerificationDto userVerificationDto = UserVerificationDto.builder()
+				.platform("web")
+				.jwtPasskeyAccessVerifiedToken(null)
+				.password(TestCredentialsUtil.TEST_PASSWORD)
+				.build();
+
+		AttestedCredentialData attestedCredentialData = PasskeyTestUtil.generateAttestedCredentialData(true);
+		registerPasskeyWithConfirmedUserAccess(testCreds, userVerificationDto, attestedCredentialData);
 	}
 
 	/**
