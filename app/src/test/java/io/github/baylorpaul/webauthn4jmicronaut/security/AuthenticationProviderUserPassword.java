@@ -2,6 +2,7 @@ package io.github.baylorpaul.webauthn4jmicronaut.security;
 
 import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.UserRepository;
+import io.github.baylorpaul.webauthn4jmicronaut.util.AuthenticationUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.EmailUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.PasswordUtil;
 import io.micronaut.core.annotation.NonNull;
@@ -35,19 +36,24 @@ public class AuthenticationProviderUserPassword implements HttpRequestAuthentica
 		email = EmailUtil.formatEmailAddress(email);
 		User user = email == null ? null : userRepo.findByEmail(email).orElse(null);
 
-		// TODO a better implementation. See https://guides.micronaut.io/latest/micronaut-database-authentication-provider-gradle-groovy.html#authentication-provider
-		String rawPassword = authenticationRequest.getSecret().toString();
-		boolean passwordMatches = PasswordUtil.passwordMatches(rawPassword, user);
+		if (AuthenticationUtil.PASSWORD_AUTHENTICATION_ENABLED) {
+			// TODO a better implementation. See https://guides.micronaut.io/latest/micronaut-database-authentication-provider-gradle-groovy.html#authentication-provider
+			String rawPassword = authenticationRequest.getSecret().toString();
+			boolean passwordMatches = PasswordUtil.passwordMatches(rawPassword, user);
 
-		if (passwordMatches) {
-			return AuthenticationResponse.success(
-					Long.toString(user.getId()),
-					Collections.emptyList(),
-					// Even though we used BASIC authorization to get here, we are providing future authorization via an access token
-					TokenUtil.buildJwtClaims(user)
-			);
+			if (passwordMatches) {
+				return AuthenticationResponse.success(
+						Long.toString(user.getId()),
+						Collections.emptyList(),
+						// Even though we used BASIC authorization to get here, we are providing future authorization via an access token
+						TokenUtil.buildJwtClaims(user)
+				);
+			} else {
+				return AuthenticationResponse.failure(AuthenticationFailureReason.CREDENTIALS_DO_NOT_MATCH);
+			}
 		} else {
-			return AuthenticationResponse.failure(AuthenticationFailureReason.CREDENTIALS_DO_NOT_MATCH);
+			// Password authentication is not supported
+			return AuthenticationResponse.failure(AuthenticationFailureReason.PASSWORD_EXPIRED);
 		}
 	}
 }

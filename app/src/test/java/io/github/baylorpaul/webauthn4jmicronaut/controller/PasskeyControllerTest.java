@@ -18,6 +18,7 @@ import io.github.baylorpaul.webauthn4jmicronaut.security.passkey.model.PasskeyCr
 import io.github.baylorpaul.webauthn4jmicronaut.service.PasskeyTestService;
 import io.github.baylorpaul.webauthn4jmicronaut.service.mail.MockEmailService;
 import io.github.baylorpaul.webauthn4jmicronaut.service.mail.template.PasskeyAdditionLinkEmailTemplate;
+import io.github.baylorpaul.webauthn4jmicronaut.util.AuthenticationUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.JsonApiTestUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.PasskeyTestUtil;
 import io.micronaut.core.annotation.NonNull;
@@ -319,15 +320,17 @@ public class PasskeyControllerTest {
 	 */
 	@Test
 	public void testRegisterNewPasskeyAsAuthenticatedUserUsingAPasswordToConfirmAccess() {
-		TestCredentialsUtil.TestCreds testCreds = testCredentialsUtil.createTestCredsWithPassword();
-		UserVerificationDto userVerificationDto = UserVerificationDto.builder()
-				.platform("web")
-				.jwtPasskeyAccessVerifiedToken(null)
-				.password(TestCredentialsUtil.TEST_PASSWORD)
-				.build();
+		if (AuthenticationUtil.PASSWORD_AUTHENTICATION_ENABLED) {
+			TestCredentialsUtil.TestCreds testCreds = testCredentialsUtil.createTestCredsWithPassword();
+			UserVerificationDto userVerificationDto = UserVerificationDto.builder()
+					.platform("web")
+					.jwtPasskeyAccessVerifiedToken(null)
+					.password(TestCredentialsUtil.TEST_PASSWORD)
+					.build();
 
-		AttestedCredentialData attestedCredentialData = PasskeyTestUtil.generateAttestedCredentialData(true);
-		registerPasskeyWithConfirmedUserAccess(testCreds, userVerificationDto, attestedCredentialData);
+			AttestedCredentialData attestedCredentialData = PasskeyTestUtil.generateAttestedCredentialData(true);
+			registerPasskeyWithConfirmedUserAccess(testCreds, userVerificationDto, attestedCredentialData);
+		}
 	}
 
 	/**
@@ -432,6 +435,9 @@ public class PasskeyControllerTest {
 		Assertions.assertEquals(testCreds.userId(), pc.getUser().getId());
 	}
 
+	/**
+	 * Via API calls, create a user with a passkey
+	 */
 	@Test
 	public void testCreateUserWithPasskeyAndRetrieveUserRecord() {
 		final String email = "brand-new-user42578@gmail.com";

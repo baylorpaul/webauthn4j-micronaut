@@ -6,6 +6,7 @@ import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
 import io.github.baylorpaul.webauthn4jmicronaut.repo.UserRepository;
 import io.github.baylorpaul.webauthn4jmicronaut.service.model.enums.ConfirmationType;
 import io.github.baylorpaul.webauthn4jmicronaut.util.ApiUtil;
+import io.github.baylorpaul.webauthn4jmicronaut.util.AuthenticationUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.Utility;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -42,6 +43,11 @@ public class UserRestService {
 		// Ensure the email address is valid, formatted as expected, and unique
 		String formattedEmail = formatEmailAndEnsureUniqueness(email, true);
 		String formattedDisplayName = ApiUtil.buildAndValidateUserName(name, formattedEmail);
+
+		if (!AuthenticationUtil.PASSWORD_AUTHENTICATION_ENABLED && encodedPassword != null) {
+			// Shouldn't get here. This should've been validated before now.
+			throw new HttpStatusException(HttpStatus.METHOD_NOT_ALLOWED, "Password authentication is not supported");
+		}
 
 		User newUser = userRepo.save(
 				User.builder()

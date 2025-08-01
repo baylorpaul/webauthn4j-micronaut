@@ -11,6 +11,7 @@ import io.github.baylorpaul.webauthn4jmicronaut.security.validator.ConfirmationJ
 import io.github.baylorpaul.webauthn4jmicronaut.service.LockService;
 import io.github.baylorpaul.webauthn4jmicronaut.service.SystemService;
 import io.github.baylorpaul.webauthn4jmicronaut.service.model.enums.ConfirmationType;
+import io.github.baylorpaul.webauthn4jmicronaut.util.AuthenticationUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.PasswordUtil;
 import io.github.baylorpaul.webauthn4jmicronaut.util.Utility;
 import io.micronaut.core.annotation.NonNull;
@@ -88,18 +89,22 @@ public class SecurityRestService {
 				throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "passkey confirmation token does not match user");
 			}
 		} else if (!Utility.isEmptyTrimmed(userVerification.getPassword())) {
+			if (AuthenticationUtil.PASSWORD_AUTHENTICATION_ENABLED) {
 
-			// TODO a better password implementation, such as is commented out
+				// TODO a better password implementation, such as is commented out
 
-			//if (user.getPassword() == null) {
-			//	throw new HttpStatusException(HttpStatus.FORBIDDEN, "Cannot verify via password match. User does not have an associated password.");
-			//} else if (bCryptPasswordEncoderService.matches(userVerification.getPassword(), user.getPassword())) {
-			//	authenticated = true;
-			//} else {
-			//	throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "Invalid password");
-			//}
+				//if (user.getPassword() == null) {
+				//	throw new HttpStatusException(HttpStatus.FORBIDDEN, "Cannot verify via password match. User does not have an associated password.");
+				//} else if (bCryptPasswordEncoderService.matches(userVerification.getPassword(), user.getPassword())) {
+				//	authenticated = true;
+				//} else {
+				//	throw new HttpStatusException(HttpStatus.UNAUTHORIZED, "Invalid password");
+				//}
 
-			authenticated = PasswordUtil.passwordMatches(userVerification.getPassword(), user);
+				authenticated = PasswordUtil.passwordMatches(userVerification.getPassword(), user);
+			} else {
+				throw new HttpStatusException(HttpStatus.METHOD_NOT_ALLOWED, "Password authentication is not supported");
+			}
 		}
 
 		if (!authenticated) {
