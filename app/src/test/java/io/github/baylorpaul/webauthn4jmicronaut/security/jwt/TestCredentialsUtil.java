@@ -17,7 +17,6 @@ import io.github.baylorpaul.webauthn4jmicronaut.security.AuthenticationProviderF
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyConfigurationProperties;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyService;
 import io.github.baylorpaul.webauthn4jmicronaut.security.model.AuthenticationUserInfo;
-import io.github.baylorpaul.webauthn4jmicronaut.security.model.LoginResponse;
 import io.github.baylorpaul.webauthn4jmicronaut.security.passkey.model.PasskeyCredAndUserHandle;
 import io.github.baylorpaul.webauthn4jmicronaut.service.JsonService;
 import io.github.baylorpaul.webauthn4jmicronaut.util.ApiUtil;
@@ -41,11 +40,13 @@ import io.micronaut.security.handlers.LoginHandler;
 import io.micronaut.security.token.render.BearerAccessRefreshToken;
 import io.micronaut.transaction.TransactionDefinition;
 import io.micronaut.transaction.annotation.Transactional;
+import jakarta.annotation.Nullable;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Assertions;
 
+import java.security.SecureRandom;
 import java.util.Map;
 
 @Singleton
@@ -55,8 +56,10 @@ public class TestCredentialsUtil {
 	public static final String TEST_NAME = "Mister Williams";
 	public static final String TEST_PASSWORD = PasswordUtil.FAKE_PASSWORD;
 
+	public record UserPasskeyInfo(long userId, PasskeyCredAndUserHandle passkeyCredAndUserHandle) {}
+
 	/** Credentials for a test */
-	public record TestCreds(long userId, String accessToken) {}
+	public record TestCreds(long userId, String accessToken, @Nullable PasskeyCredAndUserHandle passkeyCredAndUserHandle) {}
 
 	@Inject
 	private JsonService jsonService;
@@ -82,6 +85,10 @@ public class TestCredentialsUtil {
 
 	@Inject
 	private UserRestService userRestService;
+
+	public static @NonNull String generateRandomEmail() {
+		return "generated-user" + new SecureRandom().nextInt() + "@example.com";
+	}
 
 	@Transactional(propagation = TransactionDefinition.Propagation.REQUIRES_NEW)
 	public @NonNull User createUser(String email) {
@@ -109,7 +116,12 @@ public class TestCredentialsUtil {
 	public TestCreds createTestCredsWithPassword() {
 		long userId = saveTestUserIfNotExists();
 		String accessToken = createAccessTokenWithPassword(TEST_EMAIL, TEST_PASSWORD);
-		return new TestCreds(userId, accessToken);
+		return new TestCreds(userId, accessToken, null);
+	}
+
+	public User findUser(UserPasskeyInfo userPasskeyInfo) {
+		return userRepo.findById(userPasskeyInfo.userId())
+				.orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "User not found"));
 	}
 
 	public User findUser(TestCreds testCreds) {
@@ -178,20 +190,44 @@ public class TestCredentialsUtil {
 		);
 
 		// Authenticate for an access token
-		HttpResponse<LoginResponse> authRsp = client.toBlocking().exchange(
+		HttpResponse<BearerAccessRefreshToken> authRsp = client.toBlocking().exchange(
 				HttpRequest.POST(
 								"/passkeys/methods/verifyAuthenticationForAccessTokenResponse",
 								jsonService.toJson(authenticationResponse)
 						)
 						.header("X-Challenge-Session-ID", dto.getChallengeSessionId().toString()),
-				LoginResponse.class
+				BearerAccessRefreshToken.class
 		);
-		LoginResponse lr = authRsp.body();
-		Assertions.assertNotNull(lr);
-		final long userId = Long.parseLong(lr.getUsername());
-		final String accessToken = lr.getAccessToken();
+		BearerAccessRefreshToken bearerAccessRefreshToken = authRsp.body();
+		Assertions.assertNotNull(bearerAccessRefreshToken);
+		final long userId = Long.parseLong(bearerAccessRefreshToken.getUsername());
+		final String accessToken = bearerAccessRefreshToken.getAccessToken();
 
-		return new TestCreds(userId, accessToken);
+		return new TestCreds(userId, accessToken, credAndUserHandle);
+	}
+
+	@Transactional(propagation = TransactionDefinition.Propagation.REQUIRES_NEW)
+	public User createUserWithPasskeyCredsViaServiceCalls(String email) {
+		TestCreds testCreds = createUserAndAccessTokenWithPasskeyCredsViaServiceCalls(email);
+		return findUser(testCreds);
+	}
+
+	/**
+	 * With service calls (not API calls), create a user and passkey credentials for that user. This is faster than
+	 * making the API calls, and is able to skip a lot of the security requirements. That speed makes it more ideal for
+	 * tests that aren't testing passkey creation, but need a passkey to exist.
+	 */
+	@Transactional(propagation = TransactionDefinition.Propagation.REQUIRES_NEW)
+	public UserPasskeyInfo createUserPasskeyCredsViaServiceCalls(
+			String email
+	) {
+		String formattedEmail = ApiUtil.formatAndValidateEmail(email);
+		String formattedDisplayName = ApiUtil.buildAndValidateUserName(null, formattedEmail);
+		long userId = saveUserIfNotExists(email, formattedDisplayName);
+
+		// Create and save a passkey
+		PasskeyCredAndUserHandle credAndUserHandle = createAndPersistPasskeyRecordByUserId(userId);
+		return new UserPasskeyInfo(userId, credAndUserHandle);
 	}
 
 	/**
@@ -202,12 +238,12 @@ public class TestCredentialsUtil {
 	 */
 	@Transactional(propagation = TransactionDefinition.Propagation.REQUIRES_NEW)
 	public TestCreds createUserAndAccessTokenWithPasskeyCredsViaServiceCalls(String email) {
-		String formattedEmail = ApiUtil.formatAndValidateEmail(email);
-		String formattedDisplayName = ApiUtil.buildAndValidateUserName(null, formattedEmail);
-		long userId = saveUserIfNotExists(email, formattedDisplayName);
+		UserPasskeyInfo userPasskeyInfo = createUserPasskeyCredsViaServiceCalls(email);
+		return authenticateForAccessToken(userPasskeyInfo);
+	}
 
-		// Create and save a passkey
-		PasskeyCredAndUserHandle credAndUserHandle = createAndPersistPasskeyRecordByUserId(userId);
+	private TestCreds authenticateForAccessToken(UserPasskeyInfo userPasskeyInfo) {
+		PasskeyCredAndUserHandle credAndUserHandle = userPasskeyInfo.passkeyCredAndUserHandle();
 
 		byte[] credentialId = credAndUserHandle.attestedCredentialDataIncludingPrivateKey().getCredentialId();
 		AuthenticationUserInfo authUserInfo = passkeyService.generateAuthenticationUserInfo(credentialId);
@@ -220,7 +256,7 @@ public class TestCredentialsUtil {
 		MutableHttpResponse<BearerAccessRefreshToken> httpResp = loginHandler.loginSuccess(authentication, null);
 		BearerAccessRefreshToken loginResponse = httpResp.body();
 
-		return new TestCreds(userId, loginResponse.getAccessToken());
+		return new TestCreds(userPasskeyInfo.userId(), loginResponse.getAccessToken(), credAndUserHandle);
 	}
 
 	/**

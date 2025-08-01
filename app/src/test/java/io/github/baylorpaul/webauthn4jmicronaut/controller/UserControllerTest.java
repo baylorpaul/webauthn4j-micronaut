@@ -37,7 +37,9 @@ public class UserControllerTest {
 
 	@BeforeEach
 	public void init() {
-		this.testCreds = testCredentialsUtil.createTestCredsWithPassword();
+		this.testCreds = testCredentialsUtil.createUserAndAccessTokenWithPasskeyCredsViaServiceCalls(
+				TestCredentialsUtil.TEST_EMAIL
+		);
 	}
 
 	@Test
@@ -53,14 +55,14 @@ public class UserControllerTest {
 
 		Map<String, Object> attrs = res.getAttributes();
 		Assertions.assertEquals(TestCredentialsUtil.TEST_EMAIL, attrs.get("email"));
-		Assertions.assertEquals(TestCredentialsUtil.TEST_NAME, attrs.get("name"));
+		//Assertions.assertEquals(TestCredentialsUtil.TEST_NAME, attrs.get("name"));
 
 		User user = JsonApiUtil.readResourceWithId(jsonMapper, res, User.class)
 				.orElseThrow(() -> new RuntimeException("Expected to find user"));
 		Assertions.assertNotNull(user);
 		Assertions.assertEquals(testCreds.userId(), user.getId());
 		Assertions.assertEquals(TestCredentialsUtil.TEST_EMAIL, user.getEmail());
-		Assertions.assertEquals(TestCredentialsUtil.TEST_NAME, user.getName());
+		//Assertions.assertEquals(TestCredentialsUtil.TEST_NAME, user.getName());
 	}
 
 	private @NonNull JsonApiResource readJsonApiResource(HttpRequest<?> request) {

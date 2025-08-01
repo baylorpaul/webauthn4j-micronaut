@@ -14,7 +14,6 @@ import io.github.baylorpaul.webauthn4jmicronaut.entity.PasskeyCredentials;
 import io.github.baylorpaul.webauthn4jmicronaut.entity.User;
 import io.github.baylorpaul.webauthn4jmicronaut.security.PasskeyConfigurationProperties;
 import io.github.baylorpaul.webauthn4jmicronaut.security.jwt.TestCredentialsUtil;
-import io.github.baylorpaul.webauthn4jmicronaut.security.model.LoginResponse;
 import io.github.baylorpaul.webauthn4jmicronaut.security.passkey.model.PasskeyCredAndUserHandle;
 import io.github.baylorpaul.webauthn4jmicronaut.service.PasskeyTestService;
 import io.github.baylorpaul.webauthn4jmicronaut.service.mail.MockEmailService;
@@ -31,10 +30,10 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.security.token.render.BearerAccessRefreshToken;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
@@ -47,8 +46,6 @@ import java.util.Set;
 @MicronautTest
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class PasskeyControllerTest {
-
-	private TestCredentialsUtil.TestCreds testCreds;
 
 	@Inject
 	@Client("/")
@@ -69,12 +66,7 @@ public class PasskeyControllerTest {
 	@Inject
 	private PasskeyConfigurationProperties passkeyConfigurationProps;
 
-	@BeforeEach
-	public void init() {
-		this.testCreds = testCredentialsUtil.createTestCredsWithPassword();
-	}
-
-	private JsonApiArray getPasskeys() {
+	private JsonApiArray getPasskeys(TestCredentialsUtil.TestCreds testCreds) {
 		HttpRequest<?> request = HttpRequest.GET(UriBuilder.of("/passkeys").queryParam("sort", "id,asc").toString())
 				.accept(MediaType.APPLICATION_JSON)
 				.bearerAuth(testCreds.accessToken());
@@ -116,9 +108,7 @@ public class PasskeyControllerTest {
 
 		PasskeyCredentials pc = passkeyTestService.registerPasskey(res, attestedCredentialData);
 
-		PublicKeyCredentialRequestOptionsSessionDto dto = passkeyTestService.generateAuthOpts();
-
-		assertAuthenticationVerificationSucceeds(dto, credAndUserHandle);
+		BearerAccessRefreshToken bearerAccessRefreshToken = passkeyTestService.logIn(credAndUserHandle);
 	}
 
 	@Test
@@ -163,27 +153,6 @@ public class PasskeyControllerTest {
 		);
 	}
 
-	private void assertAuthenticationVerificationSucceeds(
-			PublicKeyCredentialRequestOptionsSessionDto dto, PasskeyCredAndUserHandle credAndUserHandle
-	) {
-		Map<String, Object> authenticationResponse = PasskeyTestUtil.generatePasskeyAuthenticationResponse(
-				passkeyConfigurationProps, dto.getPublicKeyCredentialRequestOptions(), credAndUserHandle, null
-		);
-
-		// Now log in
-		LoginResponse loginResponse = passkeyTestService.verifyAuthentication(
-				dto.getChallengeSessionId(),
-				authenticationResponse,
-				"/passkeys/methods/verifyAuthenticationForAccessTokenResponse",
-				null,
-				LoginResponse.class
-		);
-
-		// The JWT username is the user ID
-		long userId = Long.parseLong(loginResponse.getUsername());
-		Assertions.assertTrue(userId > 0L);
-	}
-
 	/**
 	 * @param coseKey the COSEKey to sign with, which may be a different key than the one used to register the passkey
 	 *                   since we're testing failures
@@ -206,7 +175,7 @@ public class PasskeyControllerTest {
 					authenticationResponse,
 					"/passkeys/methods/verifyAuthenticationForAccessTokenResponse",
 					null,
-					LoginResponse.class
+					BearerAccessRefreshToken.class
 			);
 			Assertions.fail(errorMsgOnSuccess);
 		} catch (HttpClientResponseException e) {
@@ -231,7 +200,7 @@ public class PasskeyControllerTest {
 
 		PasskeyCredentials pc = passkeyTestService.registerPasskey(res, attestedCredentialData);
 
-		String jwtPasskeyAccessVerifiedToken = passkeyTestService.getConfirmationTokenFromPasskeyCreds(credAndUserHandle);
+		String jwtPasskeyAccessVerifiedToken = passkeyTestService.getPasskeyAccessVerifiedTokenFromPasskeyCreds(credAndUserHandle);
 
 		// TODO use the "jwtPasskeyAccessVerifiedToken" to take a protected action while not otherwise authenticated,
 		//  such as linking a federated login first the first time to an existing user account
@@ -286,7 +255,8 @@ public class PasskeyControllerTest {
 	 */
 	@Test
 	public void testGenPasskeyRegOptsViaTokenForExistingAccount() throws URISyntaxException {
-		final User user = testCredentialsUtil.createUser("brand-new-user48417@gmail.com");
+		final String userEmail = "brand-new-user48417@gmail.com";
+		final User user = testCredentialsUtil.createUserWithPasskeyCredsViaServiceCalls(userEmail);
 
 		// The URI where the token will be added. As opposed to "password reset" emails, etc., the web app
 		// implements this webpage because the passkey "Relying Party" (RP) ID and origin URL must match the web app.
@@ -349,6 +319,7 @@ public class PasskeyControllerTest {
 	 */
 	@Test
 	public void testRegisterNewPasskeyAsAuthenticatedUserUsingAPasswordToConfirmAccess() {
+		TestCredentialsUtil.TestCreds testCreds = testCredentialsUtil.createTestCredsWithPassword();
 		UserVerificationDto userVerificationDto = UserVerificationDto.builder()
 				.platform("web")
 				.jwtPasskeyAccessVerifiedToken(null)
@@ -356,7 +327,7 @@ public class PasskeyControllerTest {
 				.build();
 
 		AttestedCredentialData attestedCredentialData = PasskeyTestUtil.generateAttestedCredentialData(true);
-		registerPasskeyWithConfirmedUserAccess(userVerificationDto, attestedCredentialData);
+		registerPasskeyWithConfirmedUserAccess(testCreds, userVerificationDto, attestedCredentialData);
 	}
 
 	/**
@@ -367,6 +338,10 @@ public class PasskeyControllerTest {
 	 */
 	@Test
 	public void testRegisterNewPasskeyAsAuthenticatedUserUsingAPreExistingPasskeyToConfirmAccess() {
+		TestCredentialsUtil.TestCreds testCreds = testCredentialsUtil.createUserAndAccessTokenWithPasskeyCredsViaServiceCalls(
+				TestCredentialsUtil.generateRandomEmail()
+		);
+
 		// First, make sure we have a passkey, with which we'll re-verify access to the user's account
 		PasskeyCredAndUserHandle credAndUserHandle = testCredentialsUtil.createAndPersistPasskeyRecordByUserId(testCreds.userId());
 
@@ -380,30 +355,32 @@ public class PasskeyControllerTest {
 		// Don't reuse credAndUserHandle.attestedCredentialDataIncludingPrivateKey().
 		// Even if we tried to reuse it, we'd get a conflict due to a reuse of a credential ID.
 		AttestedCredentialData newAttestedCredentialData = PasskeyTestUtil.generateAttestedCredentialData(true);
-		registerPasskeyWithConfirmedUserAccess(
-				userVerificationDto, newAttestedCredentialData
-		);
+		registerPasskeyWithConfirmedUserAccess(testCreds, userVerificationDto, newAttestedCredentialData);
 	}
 
 	private void registerPasskeyWithConfirmedUserAccess(
+			TestCredentialsUtil.TestCreds testCreds,
 			@NonNull UserVerificationDto userVerificationDto, @NonNull AttestedCredentialData attestedCredentialData
 	) {
 		// Generate passkey registration options that will be used to add a new passkey to the user's account.
-		PublicKeyCredentialCreationOptionsSessionDto res = genRegOptsAsAuthenticatedUser(userVerificationDto);
+		PublicKeyCredentialCreationOptionsSessionDto res = genRegOptsAsAuthenticatedUser(testCreds, userVerificationDto);
 
 		// Now verify the registration of a new passkey
-		registerAndAssertPasskeyCredsCreatedForTestUser(res, attestedCredentialData);
+		registerAndAssertPasskeyCredsCreatedForTestUser(testCreds, res, attestedCredentialData);
 	}
 
 	@Test
 	public void testConfirmationTokenReuseForGenPasskeyRegOpts() {
+		TestCredentialsUtil.TestCreds testCreds = testCredentialsUtil.createUserAndAccessTokenWithPasskeyCredsViaServiceCalls(
+				TestCredentialsUtil.generateRandomEmail()
+		);
 		PasskeyCredAndUserHandle credAndUserHandle = testCredentialsUtil.createAndPersistPasskeyRecordByUserId(testCreds.userId());
 		UserVerificationDto userVerificationDto = passkeyTestService.reVerifyUserAccessViaPasskey(
 				testCreds.accessToken(), credAndUserHandle
 		);
 
 		// The first attempt to use the confirmation token should succeed
-		PublicKeyCredentialCreationOptionsSessionDto res1 = genRegOptsAsAuthenticatedUser(userVerificationDto);
+		PublicKeyCredentialCreationOptionsSessionDto res1 = genRegOptsAsAuthenticatedUser(testCreds, userVerificationDto);
 
 		// Making a separate passkey, so make new AttestedCredentialData.
 		// Don't reuse credAndUserHandle.attestedCredentialDataIncludingPrivateKey().
@@ -412,7 +389,7 @@ public class PasskeyControllerTest {
 
 		// The second attempt should fail due to token reuse
 		try {
-			genRegOptsAsAuthenticatedUser(userVerificationDto);
+			genRegOptsAsAuthenticatedUser(testCreds, userVerificationDto);
 			Assertions.fail("Expected to get a 'Gone' response");
 		} catch (HttpClientResponseException e) {
 			JsonApiTestUtil.assertJsonApiErrorResponse(e, HttpStatus.GONE,
@@ -421,11 +398,11 @@ public class PasskeyControllerTest {
 		}
 
 		// The original options are still valid
-		registerAndAssertPasskeyCredsCreatedForTestUser(res1, newAttestedCredentialData);
+		registerAndAssertPasskeyCredsCreatedForTestUser(testCreds, res1, newAttestedCredentialData);
 
 		// Now the challenge is discarded, so the original options are no longer valid
 		try {
-			registerAndAssertPasskeyCredsCreatedForTestUser(res1, newAttestedCredentialData);
+			registerAndAssertPasskeyCredsCreatedForTestUser(testCreds, res1, newAttestedCredentialData);
 			Assertions.fail("Expected to get a 'Not Found' response");
 		} catch (HttpClientResponseException e) {
 			JsonApiTestUtil.assertJsonApiErrorResponse(e, HttpStatus.NOT_FOUND,
@@ -435,11 +412,12 @@ public class PasskeyControllerTest {
 	}
 
 	private PublicKeyCredentialCreationOptionsSessionDto genRegOptsAsAuthenticatedUser(
-			UserVerificationDto userVerificationDto
+			TestCredentialsUtil.TestCreds testCreds, UserVerificationDto userVerificationDto
 	) {
+		User user = testCredentialsUtil.findUser(testCreds);
 		return passkeyTestService.genRegOptsAsAuthenticatedUser(
 				testCreds.accessToken(), userVerificationDto,
-				TestCredentialsUtil.TEST_EMAIL, TestCredentialsUtil.TEST_NAME
+				user.getEmail(), user.getName()
 		);
 	}
 
@@ -447,6 +425,7 @@ public class PasskeyControllerTest {
 	 * Register a new passkey and verify it for the test user
 	 */
 	private void registerAndAssertPasskeyCredsCreatedForTestUser(
+			TestCredentialsUtil.TestCreds testCreds,
 			PublicKeyCredentialCreationOptionsSessionDto res, AttestedCredentialData attestedCredentialData
 	) {
 		PasskeyCredentials pc = passkeyTestService.registerPasskey(res, attestedCredentialData);
@@ -474,9 +453,11 @@ public class PasskeyControllerTest {
 
 	@Test
 	public void testGetPasskeys() {
-		testCredentialsUtil.createAndPersistPasskeyRecordByUserId(testCreds.userId());
+		TestCredentialsUtil.TestCreds testCreds = testCredentialsUtil.createUserAndAccessTokenWithPasskeyCredsViaServiceCalls(
+				TestCredentialsUtil.generateRandomEmail()
+		);
 
-		JsonApiArray arr = getPasskeys();
+		JsonApiArray arr = getPasskeys(testCreds);
 
 		Assertions.assertFalse(arr.isEmpty());
 		Assertions.assertEquals(1, arr.size());
@@ -514,10 +495,12 @@ public class PasskeyControllerTest {
 
 	@Test
 	public void testPasskeyCrudOps() {
-		testCredentialsUtil.createAndPersistPasskeyRecordByUserId(testCreds.userId());
+		TestCredentialsUtil.TestCreds testCreds = testCredentialsUtil.createUserAndAccessTokenWithPasskeyCredsViaServiceCalls(
+				TestCredentialsUtil.generateRandomEmail()
+		);
 
 		// We're not going to do the C (Create) in CRUD here since Passkeys aren't created by typical API calls.
-		JsonApiArray arr = getPasskeys();
+		JsonApiArray arr = getPasskeys(testCreds);
 
 		Assertions.assertEquals(1, arr.size());
 		JsonApiResource res = arr.getFirst();
@@ -527,12 +510,12 @@ public class PasskeyControllerTest {
 				.orElseThrow(() -> new RuntimeException("Expected to find passkey credentials"));
 		Assertions.assertNotNull(pc);
 
-		pc = updatePasskey(pc);
-		pc = readPasskey(passkeyId);
-		deletePasskey(passkeyId);
+		pc = updatePasskey(testCreds, pc);
+		pc = readPasskey(testCreds, passkeyId);
+		deletePasskey(testCreds, passkeyId);
 	}
 
-	private PasskeyCredentials updatePasskey(PasskeyCredentials pc1) {
+	private PasskeyCredentials updatePasskey(TestCredentialsUtil.TestCreds testCreds, PasskeyCredentials pc1) {
 		// Ensure the attributes match expected alternate values from what we're changing them to
 		Assertions.assertNull(pc1.getPasskeyName());
 
@@ -564,7 +547,7 @@ public class PasskeyControllerTest {
 		return pc;
 	}
 
-	private PasskeyCredentials readPasskey(String passkeyId) {
+	private PasskeyCredentials readPasskey(TestCredentialsUtil.TestCreds testCreds, String passkeyId) {
 		HttpRequest<?> request = HttpRequest.GET("/passkeys/" + passkeyId)
 				.bearerAuth(testCreds.accessToken());
 
@@ -581,7 +564,7 @@ public class PasskeyControllerTest {
 	/**
 	 * Delete the passkey
 	 */
-	private void deletePasskey(String passkeyId) {
+	private void deletePasskey(TestCredentialsUtil.TestCreds testCreds, String passkeyId) {
 		HttpRequest<?> req1 = HttpRequest.DELETE("/passkeys/" + passkeyId)
 				.bearerAuth(testCreds.accessToken());
 

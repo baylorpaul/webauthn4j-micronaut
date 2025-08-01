@@ -2,6 +2,8 @@ package io.github.baylorpaul.webauthn4jmicronaut.service;
 
 import com.github.dockerjava.zerodep.shaded.org.apache.hc.core5.http.NameValuePair;
 import com.github.dockerjava.zerodep.shaded.org.apache.hc.core5.net.URLEncodedUtils;
+import com.nimbusds.jwt.JWTParser;
+import com.nimbusds.jwt.SignedJWT;
 import com.webauthn4j.data.PublicKeyCredentialCreationOptions;
 import com.webauthn4j.data.PublicKeyCredentialParameters;
 import com.webauthn4j.data.PublicKeyCredentialType;
@@ -28,6 +30,7 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.security.token.render.BearerAccessRefreshToken;
 import jakarta.annotation.Nullable;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -37,6 +40,7 @@ import org.junit.jupiter.api.Assertions;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -61,7 +65,10 @@ public class PasskeyTestService {
 	@Inject
 	private JsonService jsonService;
 
-	public String getConfirmationTokenFromPasskeyCreds(PasskeyCredAndUserHandle credAndUserHandle) {
+	/**
+	 * Login with a passkey in exchange for a confirmation token that can be used to verify a recent passkey login
+	 */
+	public String getPasskeyAccessVerifiedTokenFromPasskeyCreds(PasskeyCredAndUserHandle credAndUserHandle) {
 		PublicKeyCredentialRequestOptionsSessionDto dto = generateAuthOpts();
 
 		Map<String, Object> authenticationResponse = PasskeyTestUtil.generatePasskeyAuthenticationResponse(
@@ -147,6 +154,49 @@ public class PasskeyTestService {
 		Assertions.assertNotNull(res.getData());
 
 		return readAndAssertPasskeyCredentials(res.getData());
+	}
+
+	/**
+	 * Login with a passkey
+	 */
+	public BearerAccessRefreshToken logIn(PasskeyCredAndUserHandle credAndUserHandle) {
+		PublicKeyCredentialRequestOptionsSessionDto dto = generateAuthOpts();
+		return verifyAuthenticationForAccessTokenResponse(dto, credAndUserHandle);
+	}
+
+	/**
+	 * Login with a passkey
+	 */
+	private BearerAccessRefreshToken verifyAuthenticationForAccessTokenResponse(
+			PublicKeyCredentialRequestOptionsSessionDto dto, PasskeyCredAndUserHandle credAndUserHandle
+	) {
+		Map<String, Object> authenticationResponse = PasskeyTestUtil.generatePasskeyAuthenticationResponse(
+				passkeyProps, dto.getPublicKeyCredentialRequestOptions(), credAndUserHandle, null
+		);
+
+		// Now log in
+		BearerAccessRefreshToken bearerAccessRefreshToken = verifyAuthentication(
+				dto.getChallengeSessionId(),
+				authenticationResponse,
+				"/passkeys/methods/verifyAuthenticationForAccessTokenResponse",
+				null,
+				BearerAccessRefreshToken.class
+		);
+
+		// The JWT username is the user ID
+		long userId = Long.parseLong(bearerAccessRefreshToken.getUsername());
+		Assertions.assertTrue(userId > 0L);
+
+		Assertions.assertNotNull(bearerAccessRefreshToken.getAccessToken());
+		//Assertions.assertNotNull(bearerAccessRefreshToken.getRefreshToken());
+
+		try {
+			Assertions.assertInstanceOf(SignedJWT.class, JWTParser.parse(bearerAccessRefreshToken.getAccessToken()));
+		} catch (ParseException e) {
+			throw new RuntimeException(e);
+		}
+
+		return bearerAccessRefreshToken;
 	}
 
 	public <T> T verifyAuthentication(
