@@ -44,7 +44,10 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-params")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
-    testImplementation("org.testcontainers:testcontainers")
+    // Need to start using version 2 for socket compatibility with Docker Desktop v4.54.0. As of 2026-01-06, this was
+    // using v1.20.6, as are the others above, such as "org.testcontainers:postgresql". Once this uses v2, we can stop
+    // specifying the version again.
+    testImplementation("org.testcontainers:testcontainers:2.0.2")
     testCompileOnly("org.projectlombok:lombok")
     aotPlugins platform("io.micronaut.platform:micronaut-platform:4.9.2")
     aotPlugins("io.micronaut.security:micronaut-security-aot")
