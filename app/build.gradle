@@ -1,8 +1,8 @@
 plugins {
-    id("io.micronaut.application") version "4.5.4"
-    id("com.gradleup.shadow") version "8.3.7"
+    id("io.micronaut.application") version "4.6.2"
+    id("com.gradleup.shadow") version "8.3.9"
     id("idea")
-    id("io.micronaut.aot") version "4.5.4"
+    id("io.micronaut.aot") version "4.6.2"
 }
 
 version = "0.1"
@@ -48,8 +48,9 @@ dependencies {
     // using v1.20.6, as are the others above, such as "org.testcontainers:postgresql". Once this uses v2, we can stop
     // specifying the version again.
     testImplementation("org.testcontainers:testcontainers:2.0.2")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testCompileOnly("org.projectlombok:lombok")
-    aotPlugins platform("io.micronaut.platform:micronaut-platform:4.9.2")
+    aotPlugins platform("io.micronaut.platform:micronaut-platform:4.10.9")
     aotPlugins("io.micronaut.security:micronaut-security-aot")
 
     implementation(project(":library"))
