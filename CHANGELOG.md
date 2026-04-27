@@ -1,5 +1,22 @@
 # Versions
 
+## 1.2.0
+
+_April 27, 2026_
+
+### Library
+
+- Upgraded com.webauthn4j:webauthn4j-core from 0.29.4.RELEASE to 0.31.3.RELEASE
+- Upgraded Micronaut from 4.8.2 to 4.10.12
+
+### Sample Backend App
+
+- Password support: New utility class with a boolean to disable password support (rely on passkeys only)
+
+### Sample Web App
+
+- For `fetch()` requests via `fetchOrFetchError()`, set option `credentials: 'include'`
+
 ## 1.1.3
 
 _June 19, 2025_
