@@ -1,7 +1,5 @@
 package io.github.baylorpaul.webauthn4jmicronaut.util;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import com.webauthn4j.WebAuthnManager;
 import com.webauthn4j.converter.AttestedCredentialDataConverter;
 import com.webauthn4j.converter.util.CborConverter;
@@ -29,6 +27,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.exceptions.HttpStatusException;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.dataformat.cbor.CBORMapper;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -59,8 +59,9 @@ public class PasskeyUtil {
 	public static final Duration AUTHENTICATION_TIMEOUT = Duration.ofMinutes(5);
 
 	public static ObjectConverter findObjectConverter() {
-		ObjectMapper jsonMapper = new ObjectMapper();
-		ObjectMapper cborMapper = new ObjectMapper(new CBORFactory());
+		JsonMapper jsonMapper = new JsonMapper();
+		// Or CBORMapper.builder().build()
+		CBORMapper cborMapper = new CBORMapper();
 
 		// Fix issue during native tests, such as:
 		// com.fasterxml.jackson.databind.exc.InvalidDefinitionException: No serializer found for class
