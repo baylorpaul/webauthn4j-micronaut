@@ -34,7 +34,10 @@ export function fetchOrFetchError(
 			cache: 'no-store',
 		};
 	}
-	const result = fetch(input, init);
+	const result = fetch(input, {
+		...init,
+		credentials: 'include',
+	});
 	return wrapErrorsAsFetchError(result, options?.errorResponseConverter ?? readErrorMessagesAsString);
 }
 
