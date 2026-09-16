@@ -1,5 +1,20 @@
 # Versions
 
+## 2.0.0
+
+_September 16, 2026_
+
+### Library
+
+- Upgraded Micronaut from 4.10.12 to 5.1.5
+- Upgraded from Java 21 to Java 25. This is required by Micronaut 5
+- Upgraded com.webauthn4j:webauthn4j-core from 0.31.3.RELEASE to 0.31.10.RELEASE
+- Library updates: org.springframework.security:spring-security-crypto and com.google.cloud.sql:postgres-socket-factory
+
+### Sample Backend App
+
+- Updated CORS config due to breaking change in Micronaut 5. `micronaut.server.cors.configurations.web.allow-credentials` now defaults to false, so we set it to true.
+
 ## 1.2.0
 
 _April 27, 2026_
