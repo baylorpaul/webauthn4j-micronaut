@@ -57,5 +57,19 @@
         "parameterTypes": ["org.flywaydb.database.postgresql.TransactionalModel"]
       }
     ]
+  },
+  {
+    "name": "com.webauthn4j.data.internal.asn1.der.ASN1Length",
+    "allPublicConstructors": true,
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "com.webauthn4j.data.internal.asn1.der.ASN1Tag",
+    "allPublicConstructors": true,
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
   }
 ]

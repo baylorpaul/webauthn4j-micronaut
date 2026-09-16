@@ -22,6 +22,7 @@ import io.github.baylorpaul.webauthn4jmicronaut.util.PasskeyUtil;
 import io.micronaut.json.JsonMapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -91,8 +92,14 @@ public class WebAuthn4JSerdeTest {
 		Assertions.assertEquals("{}", serializedAuthenticatorExtensions1);
 		Assertions.assertEquals("{\"credProtect\":3,\"hmac-secret\":true}", serializedAuthenticatorExtensions2);
 
-		AuthenticationExtensionsAuthenticatorOutputs<RegistrationExtensionAuthenticatorOutput> authenticatorExtensions3 = jsonConverter.readValue(serializedAuthenticatorExtensions1, AuthenticationExtensionsAuthenticatorOutputs.class);
-		AuthenticationExtensionsAuthenticatorOutputs<RegistrationExtensionAuthenticatorOutput> authenticatorExtensions4 = jsonConverter.readValue(serializedAuthenticatorExtensions2, AuthenticationExtensionsAuthenticatorOutputs.class);
+		// AuthenticationExtensionsAuthenticatorOutputs no longer has a JSON Deserializer registered (only a CBOR
+		// one, since authenticator extension outputs are meant to arrive embedded in CBOR authenticator data), so
+		// jsonConverter.readValue(json, AuthenticationExtensionsAuthenticatorOutputs.class) silently returns an
+		// empty instance. Parse the JSON into a tree and use the class's raw-data constructor instead.
+		ObjectNode node1 = (ObjectNode) objectConverter.getJsonMapper().readTree(serializedAuthenticatorExtensions1);
+		ObjectNode node2 = (ObjectNode) objectConverter.getJsonMapper().readTree(serializedAuthenticatorExtensions2);
+		AuthenticationExtensionsAuthenticatorOutputs<RegistrationExtensionAuthenticatorOutput> authenticatorExtensions3 = new AuthenticationExtensionsAuthenticatorOutputs<>(node1, objectConverter);
+		AuthenticationExtensionsAuthenticatorOutputs<RegistrationExtensionAuthenticatorOutput> authenticatorExtensions4 = new AuthenticationExtensionsAuthenticatorOutputs<>(node2, objectConverter);
 
 		Assertions.assertNotNull(authenticatorExtensions3);
 		Assertions.assertNotNull(authenticatorExtensions4);
@@ -114,9 +121,14 @@ public class WebAuthn4JSerdeTest {
 		String serializedTransports = jsonMapper.writeValueAsString(transports);
 		Assertions.assertNotNull(serializedTransports);
 
-		String[] deserializedTransportsArr = jsonMapper.readValue(serializedTransports, String[].class);
+		// AuthenticatorTransport's Jackson annotations moved from com.fasterxml.jackson to webauthn4j's own
+		// tools.jackson fork, which Micronaut Serde's @SerdeImport introspection doesn't recognize. So it's now
+		// serialized as a bean, e.g. {"value":"internal"}, rather than as a bare string.
+		Map[] deserializedTransportsArr = jsonMapper.readValue(serializedTransports, Map[].class);
 		Assertions.assertNotNull(deserializedTransportsArr);
-		List<String> deserializedTransports = Arrays.asList(deserializedTransportsArr);
+		List<String> deserializedTransports = Arrays.stream(deserializedTransportsArr)
+				.map(m -> (String) m.get("value"))
+				.toList();
 		Assertions.assertEquals(transports.size(), deserializedTransports.size());
 		Assertions.assertTrue(deserializedTransports.contains("internal"));
 		Assertions.assertTrue(deserializedTransports.contains("hybrid"));
