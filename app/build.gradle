@@ -1,8 +1,8 @@
 plugins {
-    id("io.micronaut.application") version "4.6.2"
-    id("com.gradleup.shadow") version "8.3.9"
+    id("io.micronaut.application") version "5.0.2"
+    id("com.gradleup.shadow") version "9.4.1"
     id("idea")
-    id("io.micronaut.aot") version "4.6.2"
+    id("io.micronaut.aot") version "5.0.2"
 }
 
 version = "0.1"
@@ -16,7 +16,7 @@ dependencies {
     annotationProcessor("org.projectlombok:lombok")
     annotationProcessor("io.micronaut.data:micronaut-data-processor")
     annotationProcessor("io.micronaut:micronaut-http-validation")
-    annotationProcessor("io.micronaut.security:micronaut-security-annotations")
+    annotationProcessor("io.micronaut.security:micronaut-security-processor")
     annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
     annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
     //implementation("io.micrometer:context-propagation")
@@ -40,17 +40,14 @@ dependencies {
     runtimeOnly("com.google.cloud.sql:postgres-socket-factory:1.25.1")
     testAnnotationProcessor("org.projectlombok:lombok")
     testImplementation("io.micronaut:micronaut-http-client")
-    testImplementation("org.apache.commons:commons-compress:1.27.1")
+    testImplementation("org.apache.commons:commons-compress:1.28.0")
     testImplementation("org.junit.jupiter:junit-jupiter-params")
-    testImplementation("org.testcontainers:junit-jupiter")
-    testImplementation("org.testcontainers:postgresql")
-    // Need to start using version 2 for socket compatibility with Docker Desktop v4.54.0. As of 2026-01-06, this was
-    // using v1.20.6, as are the others above, such as "org.testcontainers:postgresql". Once this uses v2, we can stop
-    // specifying the version again.
-    testImplementation("org.testcontainers:testcontainers:2.0.2")
+    testImplementation("org.testcontainers:testcontainers")
+    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+    testImplementation("org.testcontainers:testcontainers-postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testCompileOnly("org.projectlombok:lombok")
-    aotPlugins platform("io.micronaut.platform:micronaut-platform:4.10.12")
+    aotPlugins platform("io.micronaut.platform:micronaut-platform:5.1.5")
     aotPlugins("io.micronaut.security:micronaut-security-aot")
 
     implementation(project(":library"))
@@ -63,12 +60,20 @@ application {
     mainClass = "io.github.baylorpaul.webauthn4jmicronaut.Application"
 }
 java {
-    sourceCompatibility = JavaVersion.toVersion("21")
-    targetCompatibility = JavaVersion.toVersion("21")
+    sourceCompatibility = JavaVersion.toVersion("25")
+    targetCompatibility = JavaVersion.toVersion("25")
 }
 
 
 graalvmNative.toolchainDetection = false
+graalvmNative {
+    binaries {
+        all {
+            buildArgs.add("-H:+SharedArenaSupport")
+        }
+    }
+}
+
 
 micronaut {
     runtime("netty")
@@ -96,15 +101,24 @@ micronaut {
     }
 }
 
+tasks.named("dockerfile") {
+    baseImage = "eclipse-temurin:25-jre"
+}
 
 tasks.named("dockerfileNative") {
     baseImage = "amazonlinux:2023"
-    //jdkVersion = "21"
+    //jdkVersion = "25"
     args(
             "-XX:MaximumHeapSizePercent=80",
             "-Dio.netty.allocator.numDirectArenas=0",
             "-Dio.netty.noPreferDirect=true"
     )
+}
+
+
+// https://docs.gradle.org/current/userguide/upgrading_major_version_9.html#test_task_fails_when_no_tests_are_discovered
+tasks.withType(AbstractTestTask).configureEach {
+    failOnNoDiscoveredTests = false
 }
 
 

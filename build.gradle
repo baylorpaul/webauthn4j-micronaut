@@ -1,0 +1,22 @@
+plugins {
+    // Declared here (and applied with apply false) so that :app and :library resolve these plugins
+    // - and the GraalVM Native Build Tools plugin they apply transitively - through a single shared
+    // classloader. Without this, Gradle 9 rejects the build with:
+    // "Cannot set the value of task ':library:collectReachabilityMetadata' property 'metadataService'...
+    // loaded with InstrumentingVisitableURLClassLoader(...) using a provider... loaded with
+    // InstrumentingVisitableURLClassLoader(...)"
+    // See https://github.com/gradle/gradle/issues/33863
+    id("io.micronaut.library") version "5.0.2" apply false
+    id("io.micronaut.application") version "5.0.2" apply false
+    // io.micronaut.aot is an `api` dependency of the plugin artifact behind io.micronaut.application/io.micronaut.library,
+    // so its classes get pulled onto the shared classpath transitively. Declaring it explicitly here resolves it as a
+    // proper versioned plugin request before that happens - otherwise app/build.gradle's own `id("io.micronaut.aot")`
+    // request fails with "the plugin is already on the classpath with an unknown version".
+    id("io.micronaut.aot") version "5.0.2" apply false
+    // io.micronaut.application has a `compileOnly` dependency on the Shadow plugin to integrate with `shadowJar`
+    // conditionally. Now that io.micronaut.application resolves in this shared root classloader, Shadow needs to be
+    // resolved here too (same version as app/build.gradle) - otherwise Micronaut's plugin code can't load the
+    // ShadowJar class from app's separate subproject classloader scope, failing with
+    // "Unable to load class 'com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar'".
+    id("com.gradleup.shadow") version "9.4.1" apply false
+}
