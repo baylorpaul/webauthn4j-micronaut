@@ -38,6 +38,12 @@ java {
     withJavadocJar()
 }
 
+tasks.named('test') {
+    // The test sourceSet only holds shared test utility classes (packaged by libTestJar below for the app
+    // module's tests to use), not actual @Test classes, so there's nothing here for Gradle to discover.
+    failOnNoDiscoveredTests = false
+}
+
 tasks.named('jar') {
     manifest {
         attributes('Implementation-Title': 'webauthn4j-micronaut',
