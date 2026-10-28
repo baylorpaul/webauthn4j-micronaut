@@ -47,7 +47,7 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testCompileOnly("org.projectlombok:lombok")
-    aotPlugins platform("io.micronaut.platform:micronaut-platform:5.1.5")
+    aotPlugins platform("io.micronaut.platform:micronaut-platform:5.2.4")
     aotPlugins("io.micronaut.security:micronaut-security-aot")
 
     implementation(project(":library"))
@@ -85,12 +85,11 @@ micronaut {
     aot {
         // Please review carefully the optimizations enabled below
         // Check https://micronaut-projects.github.io/micronaut-aot/latest/guide/ for more details
-        optimizeServiceLoading = false
         convertYamlToJava = false
-        precomputeOperations = true
-        cacheEnvironment = true
+        precomputeOperations = false
+        cacheEnvironment = false
         optimizeClassLoading = true
-        deduceEnvironment = true
+        deduceEnvironment = false
         optimizeNetty = true
         // Comment out "replaceLogbackXml". It's from https://github.com/micronaut-projects/micronaut-starter/pull/2424
         // It seems it should be false for native builds. If true on projects using the "slf4j-simple" feature, then
